@@ -1,9 +1,9 @@
 {
-  "name": "helloworld-sample",
-  "displayName": "helloworld-sample",
-  "description": "HelloWorld example for VS Code",
-  "version": "0.0.1",
-  "publisher": "vscode-samples",
+  "name": "mcp-mail-vscode-extension",
+  "displayName": "MCP Mail for VS Code Copilot",
+  "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
+  "version": "0.1.0",
+  "publisher": "dealenx",
   "repository": "https://github.com/Microsoft/vscode-extension-samples/helloworld-sample",
   "engines": {
     "vscode": "^1.100.0"
@@ -13,6 +13,14 @@
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "lint": "eslint",
+    "build": "npm run compile",
+    "watch": "tsc -watch -p ./",
+    "package": "npx vsce package --no-dependencies --allow-missing-repository"
+  },
   "contributes": {
     "commands": [
       {
@@ -20,13 +28,58 @@
         "title": "Hello World"
       }
     ],
+    "configuration": {
+      "title": "MCP Mail",
+      "properties": {
+        "mcpMail.imapHost": {
+          "type": "string",
+          "default": "",
+          "description": "IMAP server host"
+        },
+        "mcpMail.imapPort": {
+          "type": "number",
+          "default": 993,
+          "description": "IMAP server port"
+        },
+        "mcpMail.imapSecure": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use TLS for IMAP"
+        },
+        "mcpMail.smtpHost": {
+          "type": "string",
+          "default": "",
+          "description": "SMTP server host"
+        },
+        "mcpMail.smtpPort": {
+          "type": "number",
+          "default": 465,
+          "description": "SMTP server port"
+        },
+        "mcpMail.smtpSecure": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use TLS for SMTP"
+        },
+        "mcpMail.emailUser": {
+          "type": "string",
+          "default": "",
+          "description": "Email username (used for both IMAP and SMTP)"
+        },
+        "mcpMail.emailPass": {
+          "type": "string",
+          "default": "",
+          "description": "Email password (used for both IMAP and SMTP)"
+        }
+      }
+    },
     "languageModelTools": [
       {
         "name": "hello_world_tool",
         "displayName": "Hello World Alert",
         "toolReferenceName": "helloWorldTool",
         "userDescription": "Shows Hello World in VS Code alert",
-        "modelDescription": "Use this tool to display 'Hello World' in a VS Code information message. This tool takes no parameters and simply shows an alert dialog with the message 'Hello World'.",
+        "modelDescription": "Use this tool to display 'Hello World' in a VS Code information message.",
         "icon": "$(comment)",
         "tags": [
           "demo",
@@ -39,19 +92,643 @@
           "properties": {},
           "required": []
         }
+      },
+      {
+        "name": "mail_connect_all",
+        "displayName": "Mail Connect All",
+        "toolReferenceName": "mailConnect",
+        "userDescription": "Connect to both IMAP and SMTP servers",
+        "modelDescription": "Connects to both IMAP (for reading emails) and SMTP (for sending emails) servers. Required before any other mail operation.",
+        "icon": "$(mail)",
+        "tags": [
+          "mail",
+          "connect",
+          "imap",
+          "smtp"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      {
+        "name": "mail_disconnect_all",
+        "displayName": "Mail Disconnect All",
+        "toolReferenceName": "mailDisconnect",
+        "userDescription": "Disconnect from all mail servers",
+        "modelDescription": "Disconnects from all currently connected IMAP and SMTP servers.",
+        "icon": "$(debug-disconnect)",
+        "tags": [
+          "mail",
+          "disconnect"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      {
+        "name": "mail_get_connection_status",
+        "displayName": "Mail Connection Status",
+        "toolReferenceName": "mailStatus",
+        "userDescription": "Get current IMAP and SMTP connection status",
+        "modelDescription": "Returns the current connection status of IMAP and SMTP servers.",
+        "icon": "$(pulse)",
+        "tags": [
+          "mail",
+          "status"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      {
+        "name": "mail_list_mailboxes",
+        "displayName": "List Mailboxes",
+        "toolReferenceName": "mailListMailbox",
+        "userDescription": "List all available mailboxes (folders)",
+        "modelDescription": "Lists all available mailboxes/folders on the IMAP server.",
+        "icon": "$(folder)",
+        "tags": [
+          "mail",
+          "list",
+          "mailbox"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      {
+        "name": "mail_open_mailbox",
+        "displayName": "Open Mailbox",
+        "toolReferenceName": "mailOpenMailbox",
+        "userDescription": "Open a specific mailbox",
+        "modelDescription": "Opens a specific mailbox (folder) on the IMAP server. Defaults to INBOX.",
+        "icon": "$(folder-opened)",
+        "tags": [
+          "mail",
+          "open",
+          "mailbox"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "mailboxName": {
+              "type": "string",
+              "description": "Name of the mailbox to open",
+              "default": "INBOX"
+            },
+            "readOnly": {
+              "type": "boolean",
+              "description": "Open in read-only mode",
+              "default": false
+            }
+          },
+          "required": []
+        }
+      },
+      {
+        "name": "mail_get_message_count",
+        "displayName": "Get Message Count",
+        "toolReferenceName": "mailMessageCount",
+        "userDescription": "Get total number of messages in INBOX",
+        "modelDescription": "Returns the total number of messages in the INBOX.",
+        "icon": "$(three-bars)",
+        "tags": [
+          "mail",
+          "count"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      {
+        "name": "mail_get_unseen_messages",
+        "displayName": "Get Unseen Messages",
+        "toolReferenceName": "mailUnseen",
+        "userDescription": "Get unread messages",
+        "modelDescription": "Returns unread (unseen) messages from the INBOX, up to a specified limit.",
+        "icon": "$(mail-unread)",
+        "tags": [
+          "mail",
+          "unread",
+          "inbox"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "number",
+              "description": "Maximum number of messages to fetch",
+              "default": 50
+            }
+          },
+          "required": []
+        }
+      },
+      {
+        "name": "mail_get_recent_messages",
+        "displayName": "Get Recent Messages",
+        "toolReferenceName": "mailRecent",
+        "userDescription": "Get most recent messages",
+        "modelDescription": "Returns the most recent messages from the INBOX, up to a specified limit.",
+        "icon": "$(history)",
+        "tags": [
+          "mail",
+          "recent"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "number",
+              "description": "Maximum number of messages to fetch",
+              "default": 50
+            }
+          },
+          "required": []
+        }
+      },
+      {
+        "name": "mail_search_by_sender",
+        "displayName": "Search by Sender",
+        "toolReferenceName": "mailSearchSender",
+        "userDescription": "Search emails by sender address",
+        "modelDescription": "Search emails from a specific sender with optional date range across all mailboxes.",
+        "icon": "$(search)",
+        "tags": [
+          "mail",
+          "search",
+          "sender"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sender": {
+              "type": "string",
+              "description": "Email address of the sender"
+            },
+            "startDate": {
+              "type": "string",
+              "description": "Optional start date filter"
+            },
+            "endDate": {
+              "type": "string",
+              "description": "Optional end date filter"
+            },
+            "inboxOnly": {
+              "type": "boolean",
+              "description": "Only search INBOX",
+              "default": false
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum results"
+            }
+          },
+          "required": [
+            "sender"
+          ]
+        }
+      },
+      {
+        "name": "mail_search_by_subject",
+        "displayName": "Search by Subject",
+        "toolReferenceName": "mailSearchSubject",
+        "userDescription": "Search emails by subject keywords",
+        "modelDescription": "Search emails containing the given subject keywords.",
+        "icon": "$(search)",
+        "tags": [
+          "mail",
+          "search",
+          "subject"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "subject": {
+              "type": "string",
+              "description": "Keywords to search in email subject"
+            },
+            "startDate": {
+              "type": "string",
+              "description": "Optional start date filter"
+            },
+            "endDate": {
+              "type": "string",
+              "description": "Optional end date filter"
+            },
+            "inboxOnly": {
+              "type": "boolean",
+              "description": "Only search INBOX",
+              "default": false
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum results"
+            }
+          },
+          "required": [
+            "subject"
+          ]
+        }
+      },
+      {
+        "name": "mail_search_by_body",
+        "displayName": "Search by Body Text",
+        "toolReferenceName": "mailSearchBody",
+        "userDescription": "Search emails by body text",
+        "modelDescription": "Search emails containing specific text in the body.",
+        "icon": "$(search)",
+        "tags": [
+          "mail",
+          "search",
+          "body"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Text to search for in message body"
+            },
+            "startDate": {
+              "type": "string",
+              "description": "Optional start date filter"
+            },
+            "endDate": {
+              "type": "string",
+              "description": "Optional end date filter"
+            },
+            "inboxOnly": {
+              "type": "boolean",
+              "description": "Only search INBOX",
+              "default": false
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum results"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      },
+      {
+        "name": "mail_search_since_date",
+        "displayName": "Search Since Date",
+        "toolReferenceName": "mailSearchSince",
+        "userDescription": "Search emails since a specific date",
+        "modelDescription": "Search emails received since a specific date (until now).",
+        "icon": "$(search)",
+        "tags": [
+          "mail",
+          "search",
+          "date"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "description": "Start date to search from"
+            },
+            "inboxOnly": {
+              "type": "boolean",
+              "description": "Only search INBOX",
+              "default": false
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum results"
+            }
+          },
+          "required": [
+            "date"
+          ]
+        }
+      },
+      {
+        "name": "mail_search_all_messages",
+        "displayName": "Search All Messages",
+        "toolReferenceName": "mailSearchAll",
+        "userDescription": "Search all messages",
+        "modelDescription": "Search all messages across mailboxes with optional date range and limit.",
+        "icon": "$(search)",
+        "tags": [
+          "mail",
+          "search",
+          "all"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "startDate": {
+              "type": "string",
+              "description": "Optional start date filter"
+            },
+            "endDate": {
+              "type": "string",
+              "description": "Optional end date filter"
+            },
+            "inboxOnly": {
+              "type": "boolean",
+              "description": "Only search INBOX",
+              "default": false
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum results",
+              "default": 50
+            }
+          },
+          "required": []
+        }
+      },
+      {
+        "name": "mail_get_messages",
+        "displayName": "Get Messages by UIDs",
+        "toolReferenceName": "mailGetMessages",
+        "userDescription": "Retrieve multiple messages by their UIDs",
+        "modelDescription": "Retrieves multiple email messages by their unique UIDs.",
+        "icon": "$(mail)",
+        "tags": [
+          "mail",
+          "read",
+          "uid"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "uids": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "description": "Array of message UIDs to retrieve"
+            },
+            "markSeen": {
+              "type": "boolean",
+              "description": "Mark as seen",
+              "default": false
+            }
+          },
+          "required": [
+            "uids"
+          ]
+        }
+      },
+      {
+        "name": "mail_get_message",
+        "displayName": "Get Message by UID",
+        "toolReferenceName": "mailGetMessage",
+        "userDescription": "Retrieve a specific email by UID",
+        "modelDescription": "Retrieves a single email message by its UID.",
+        "icon": "$(mail-read)",
+        "tags": [
+          "mail",
+          "read",
+          "uid"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "uid": {
+              "type": "number",
+              "description": "Message UID"
+            },
+            "markSeen": {
+              "type": "boolean",
+              "description": "Mark as seen",
+              "default": false
+            }
+          },
+          "required": [
+            "uid"
+          ]
+        }
+      },
+      {
+        "name": "mail_delete_message",
+        "displayName": "Delete Message",
+        "toolReferenceName": "mailDelete",
+        "userDescription": "Delete an email by UID",
+        "modelDescription": "Deletes an email message by its UID.",
+        "icon": "$(trash)",
+        "tags": [
+          "mail",
+          "delete"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "uid": {
+              "type": "number",
+              "description": "Message UID to delete"
+            }
+          },
+          "required": [
+            "uid"
+          ]
+        }
+      },
+      {
+        "name": "mail_get_attachments",
+        "displayName": "Get Attachments Metadata",
+        "toolReferenceName": "mailGetAttachments",
+        "userDescription": "Get attachment metadata for an email",
+        "modelDescription": "Returns metadata (filename, size, contentType) for attachments in an email.",
+        "icon": "$(paperclip)",
+        "tags": [
+          "mail",
+          "attachments"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "uid": {
+              "type": "number",
+              "description": "Message UID"
+            }
+          },
+          "required": [
+            "uid"
+          ]
+        }
+      },
+      {
+        "name": "mail_save_attachment",
+        "displayName": "Save Attachment",
+        "toolReferenceName": "mailSaveAttachment",
+        "userDescription": "Download and save an email attachment",
+        "modelDescription": "Downloads an email attachment to a temporary directory. Optionally returns base64-encoded content.",
+        "icon": "$(save)",
+        "tags": [
+          "mail",
+          "attachments",
+          "save"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "uid": {
+              "type": "number",
+              "description": "Message UID"
+            },
+            "attachmentIndex": {
+              "type": "number",
+              "description": "0-based index of the attachment. Omit to save all."
+            },
+            "returnBase64": {
+              "type": "boolean",
+              "description": "Return base64 content instead of saving to file",
+              "default": false
+            }
+          },
+          "required": [
+            "uid"
+          ]
+        }
+      },
+      {
+        "name": "mail_send_email",
+        "displayName": "Send Email",
+        "toolReferenceName": "mailSend",
+        "userDescription": "Send an email via SMTP",
+        "modelDescription": "Sends an email via SMTP. Supports text/html body, CC, BCC, and file attachments (absolute paths).",
+        "icon": "$(send)",
+        "tags": [
+          "mail",
+          "send",
+          "smtp"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "to": {
+              "type": "string",
+              "description": "Recipient(s), comma-separated"
+            },
+            "subject": {
+              "type": "string",
+              "description": "Email subject"
+            },
+            "text": {
+              "type": "string",
+              "description": "Plain text body"
+            },
+            "html": {
+              "type": "string",
+              "description": "HTML body (optional)"
+            },
+            "cc": {
+              "type": "string",
+              "description": "CC recipients (optional)"
+            },
+            "bcc": {
+              "type": "string",
+              "description": "BCC recipients (optional)"
+            },
+            "attachments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Absolute file paths to attach"
+            }
+          },
+          "required": [
+            "to",
+            "subject"
+          ]
+        }
+      },
+      {
+        "name": "mail_reply_to_email",
+        "displayName": "Reply to Email",
+        "toolReferenceName": "mailReply",
+        "userDescription": "Reply to an email by UID",
+        "modelDescription": "Replies to an existing email by UID. Supports reply-to-all and optional inclusion of the original message.",
+        "icon": "$(reply)",
+        "tags": [
+          "mail",
+          "reply",
+          "smtp"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "originalUid": {
+              "type": "number",
+              "description": "UID of the original message"
+            },
+            "text": {
+              "type": "string",
+              "description": "Reply text"
+            },
+            "html": {
+              "type": "string",
+              "description": "Reply HTML (optional)"
+            },
+            "replyToAll": {
+              "type": "boolean",
+              "description": "Reply to all recipients",
+              "default": false
+            },
+            "includeOriginal": {
+              "type": "boolean",
+              "description": "Include original message in reply",
+              "default": true
+            }
+          },
+          "required": [
+            "originalUid"
+          ]
+        }
       }
     ]
   },
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "lint": "eslint",
-    "watch": "tsc -watch -p ./"
+  "dependencies": {
+    "imap": "^0.8.19",
+    "mailparser": "^3.7.4",
+    "nodemailer": "^6.9.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
     "@stylistic/eslint-plugin": "^2.9.0",
+    "@types/imap": "^0.8.42",
+    "@types/mailparser": "^3.4.6",
     "@types/node": "^22",
+    "@types/nodemailer": "^6.4.0",
     "@types/vscode": "^1.100.0",
     "eslint": "^9.13.0",
     "typescript": "^5.8.2",

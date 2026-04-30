@@ -3,7 +3,7 @@ import { HelloWorldTool } from './helloWorldTool';
 import {
   MailConnectTool,
   MailDisconnectTool,
-  MailConnectionStatusTool,
+  new MailConnectionStatusTool(),
   MailListMailboxesTool,
   MailOpenMailboxTool,
   MailGetMessageCountTool,
@@ -64,3 +64,4 @@ export function activate(context: vscode.ExtensionContext) {
 export function deactivate() {
   // Extension deactivation cleanup
 }
+
