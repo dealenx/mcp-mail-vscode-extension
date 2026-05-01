@@ -29,6 +29,13 @@ export class MailSidebarProvider implements vscode.TreeDataProvider<MailSidebarI
           'plug'
         ),
         new MailSidebarItem(
+          'Отправить тестовое письмо',
+          'mcpMail.sendTestEmail',
+          'Отправить тестовое письмо на указанный адрес',
+          vscode.TreeItemCollapsibleState.None,
+          'send'
+        ),
+        new MailSidebarItem(
           'Открыть настройки',
           'mcpMail.openSettings',
           'Настройки MCP Mail',
@@ -159,6 +166,62 @@ export function registerSidebarCommands(context: vscode.ExtensionContext): void 
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         vscode.window.showErrorMessage(`❌ Ошибка SMTP: ${msg}`);
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('mcpMail.sendTestEmail', async () => {
+      mcpMailOutputChannel.info('[MCP Mail] sendTestEmail command triggered');
+
+      const recipient = await vscode.window.showInputBox({
+        prompt: 'Укажите email получателя тестового письма',
+        placeHolder: 'example@yandex.ru',
+        title: 'Отправить тестовое письмо',
+        validateInput: (value: string) => {
+          if (!value || !value.includes('@')) {
+            return 'Введите корректный email-адрес';
+          }
+          return undefined;
+        },
+      });
+
+      if (!recipient) {
+        mcpMailOutputChannel.info('[MCP Mail] sendTestEmail cancelled by user');
+        return;
+      }
+
+      mcpMailOutputChannel.info('[MCP Mail] Sending test email to:', recipient);
+
+      try {
+        const { getMailConfig } = require('./mail/config');
+        const { SMTPClient } = require('./mail/smtp-client');
+        const config = getMailConfig();
+
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Отправка тестового письма на ${recipient}...`,
+            cancellable: false,
+          },
+          async () => {
+            const client = new SMTPClient(config.SMTP);
+            await client.connect();
+            await client.sendMail({
+              from: config.SMTP.username,
+              to: recipient,
+              subject: 'Тестовое письмо — MCP Mail',
+              text: 'Это тестовое письмо от расширения MCP Mail для VS Code.\n\nЕсли вы получили это письмо, значит SMTP-подключение работает корректно!',
+            });
+            await client.disconnect();
+            vscode.window.showInformationMessage(`✅ Тестовое письмо отправлено на ${recipient}`);
+            mcpMailOutputChannel.info('[MCP Mail] Test email sent successfully');
+          }
+        );
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        mcpMailOutputChannel.error('[MCP Mail] sendTestEmail error:', msg);
+        vscode.window.showErrorMessage(`❌ Ошибка отправки: ${msg}`);
       }
     })
   );

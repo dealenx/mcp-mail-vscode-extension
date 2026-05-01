@@ -22,8 +22,8 @@ export function getMailConfig(): MailConfig {
 
   const host = cfg.get<string>('imapHost');
   const port = cfg.get<number>('imapPort');
-  const user = cfg.get<string>('emailUser');
-  const pass = cfg.get<string>('emailPass');
+  const user = cfg.get<string>('accountLogin');
+  const pass = cfg.get<string>('accountPassword');
   const tls = cfg.get<boolean>('imapSecure');
 
   const smtpHost = cfg.get<string>('smtpHost');
@@ -32,12 +32,12 @@ export function getMailConfig(): MailConfig {
 
   if (!host || !port || !user || !pass || tls === undefined) {
     throw new Error(
-      'MCP Mail configuration is incomplete. Please set all mcpMail.* settings in VS Code preferences.'
+      'Настройки MCP Mail заполнены не полностью. Укажите все параметры mcpMail.* в настройках VS Code.'
     );
   }
   if (!smtpHost || !smtpPort || smtpSecure === undefined) {
     throw new Error(
-      'MCP Mail SMTP configuration is incomplete. Please set all mcpMail.* settings in VS Code preferences.'
+      'Настройки SMTP заполнены не полностью. Укажите все параметры mcpMail.* в настройках VS Code.'
     );
   }
 

@@ -2,7 +2,7 @@
   "name": "mcp-mail-vscode-extension",
   "displayName": "MCP Mail for VS Code Copilot",
   "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
-  "version": "0.2.0",
+  "version": "0.2.5",
   "publisher": "dealenx",
   "repository": "https://github.com/Microsoft/vscode-extension-samples/helloworld-sample",
   "engines": {
@@ -23,7 +23,7 @@
     "lint": "eslint",
     "build": "npm run compile",
     "watch": "tsc -watch -p ./",
-    "package": "npx vsce package --no-dependencies --allow-missing-repository"
+    "package": "npx vsce package --allow-missing-repository"
   },
   "contributes": {
     "commands": [
@@ -34,6 +34,10 @@
       {
         "command": "mcpMail.checkConnection",
         "title": "MCP Mail: Проверь подключение"
+      },
+      {
+        "command": "mcpMail.sendTestEmail",
+        "title": "MCP Mail: Отправить тестовое письмо"
       },
       {
         "command": "mcpMail.openSettings",
@@ -63,47 +67,55 @@
       ]
     },
     "configuration": {
-      "title": "MCP Mail",
+      "title": "MCP Mail — Почта",
       "properties": {
         "mcpMail.imapHost": {
           "type": "string",
-          "default": "",
-          "description": "IMAP server host"
+          "default": "imap.yandex.ru",
+          "description": "Адрес IMAP-сервера",
+          "order": 1
         },
         "mcpMail.imapPort": {
           "type": "number",
           "default": 993,
-          "description": "IMAP server port"
+          "description": "Порт IMAP-сервера",
+          "order": 2
         },
         "mcpMail.imapSecure": {
           "type": "boolean",
           "default": true,
-          "description": "Use TLS for IMAP"
+          "description": "Использовать TLS для IMAP",
+          "order": 3
         },
         "mcpMail.smtpHost": {
           "type": "string",
-          "default": "",
-          "description": "SMTP server host"
+          "default": "smtp.yandex.ru",
+          "description": "Адрес SMTP-сервера",
+          "order": 4
         },
         "mcpMail.smtpPort": {
           "type": "number",
           "default": 465,
-          "description": "SMTP server port"
+          "description": "Порт SMTP-сервера",
+          "order": 5
         },
         "mcpMail.smtpSecure": {
           "type": "boolean",
           "default": true,
-          "description": "Use TLS for SMTP"
+          "description": "Использовать TLS для SMTP",
+          "order": 6
         },
-        "mcpMail.emailUser": {
+        "mcpMail.accountLogin": {
           "type": "string",
           "default": "",
-          "description": "Email username (used for both IMAP and SMTP)"
+          "description": "Логин почты (используется для IMAP и SMTP)",
+          "order": 7
         },
-        "mcpMail.emailPass": {
+        "mcpMail.accountPassword": {
           "type": "string",
           "default": "",
-          "description": "Email password (used for both IMAP and SMTP)"
+          "description": "Пароль почты (используется для IMAP и SMTP)",
+          "order": 8
         }
       }
     },
