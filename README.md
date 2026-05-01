@@ -1,27 +1,53 @@
-# VS Code Extension with MCP Tools for Copilot Chat
+# MCP Mail — Почта для VS Code Copilot
 
-This example demonstrates how a VS Code extension can add MCP (Model Context Protocol) tools that integrate with GitHub Copilot Chat. The extension exposes custom tools that can be invoked directly from Copilot Chat, allowing AI-powered interactions with your extension's functionality.
+Расширение добавляет инструменты работы с почтой (IMAP/SMTP) в GitHub Copilot Chat через API `languageModelTools`. Позволяет читать, искать и отправлять письма прямо из чата с ИИ, а также проверять подключение через боковую панель.
 
-Guide for this sample: https://code.visualstudio.com/api/get-started/your-first-extension.
+## Возможности
 
-## Demo
+- **Боковая панель** — проверка подключения, отправка тестового письма, настройки
+- **Чтение почты** — список писем, поиск по отправителю/теме/тексту/дате
+- **Отправка** — новые письма, ответы с вложениями
+- **Вложения** — просмотр, скачивание, прикрепление к письму
+- **Управление** — подключение/отключение, статусы, удаление писем
 
-![demo](example.png)
+## Настройка
 
-## VS Code API
+Откройте настройки VS Code (`Ctrl+,`) и найдите `MCP Mail`:
 
-### `vscode` module
+| Параметр | По умолчанию | Описание |
+|---|---|---|
+| `mcpMail.imapHost` | `imap.yandex.ru` | Адрес IMAP-сервера |
+| `mcpMail.imapPort` | `993` | Порт IMAP-сервера |
+| `mcpMail.imapSecure` | `true` | Использовать TLS для IMAP |
+| `mcpMail.smtpHost` | `smtp.yandex.ru` | Адрес SMTP-сервера |
+| `mcpMail.smtpPort` | `465` | Порт SMTP-сервера |
+| `mcpMail.smtpSecure` | `true` | Использовать TLS для SMTP |
+| `mcpMail.accountLogin` | — | Логин почты |
+| `mcpMail.accountPassword` | — | Пароль почты |
 
-- [`commands.registerCommand`](https://code.visualstudio.com/api/references/vscode-api#commands.registerCommand)
-- [`window.showInformationMessage`](https://code.visualstudio.com/api/references/vscode-api#window.showInformationMessage)
+> Для Яндекс почты используйте [пароль приложения](https://id.yandex.ru/security/app-passwords).
 
-### Contribution Points
+## Установка
 
-- [`contributes.commands`](https://code.visualstudio.com/api/references/contribution-points#contributes.commands)
+1. Скачайте `.vsix` файл
+2. В VS Code: `Ctrl+Shift+P` → `Extensions: Install from VSIX...`
+3. Выберите файл
 
-## Running the Sample
+## Сборка
 
-- Run `npm install` in terminal to install dependencies
-- Run the `Run Extension` target in the Debug View. This will:
-	- Start a task `npm: watch` to compile the code
-	- Run the extension in a new VS Code window
+```bash
+npm install
+npm run compile
+npm run package
+```
+
+## Использование с Copilot
+
+После настройки в чате Copilot станут доступны команды:
+
+```
+@workspace подключись к почте
+@workspace покажи непрочитанные письма
+@workspace найди письма от boss@company.ru
+@workspace отправь письмо на test@yandex.ru с темой "Отчёт"
+```
