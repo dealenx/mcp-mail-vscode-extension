@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { mcpMailOutputChannel } from './logger';
 import { HelloWorldTool } from './helloWorldTool';
 import {
   MailConnectTool,
@@ -25,19 +26,36 @@ import {
 import { MailSidebarProvider, registerSidebarCommands } from './mailSidebar';
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('MCP Mail VS Code extension is now active!');
+  mcpMailOutputChannel.info('[MCP Mail] Extension activating...');
 
   const disposable = vscode.commands.registerCommand('extension.helloWorld', () => {
     vscode.window.showInformationMessage('Hello World!');
   });
   context.subscriptions.push(disposable);
 
-  // Register sidebar
+  // Register sidebar using createTreeView
+  mcpMailOutputChannel.info('[MCP Mail] Creating TreeView mcpMailTreeView...');
   const mailSidebarProvider = new MailSidebarProvider();
-  context.subscriptions.push(
-    vscode.window.registerTreeDataProvider('mcpMailSidebar', mailSidebarProvider)
-  );
+  const treeView = vscode.window.createTreeView('mcpMailTreeView', {
+    treeDataProvider: mailSidebarProvider,
+    showCollapseAll: false,
+    canSelectMany: false,
+  });
+  context.subscriptions.push(treeView);
+  mcpMailOutputChannel.info('[MCP Mail] TreeView registered successfully');
+
+  // Refresh after a short delay to ensure view is ready
+  setTimeout(() => {
+    mcpMailOutputChannel.info('[MCP Mail] Triggering initial refresh');
+    mailSidebarProvider.refresh();
+  }, 500);
+  
   registerSidebarCommands(context);
+  
+  mcpMailOutputChannel.info('[MCP Mail] Extension activation complete');
+  
+  // Set context key to make sidebar visible
+  vscode.commands.executeCommand('setContext', 'mcpMail.extensionActive', true);
 
   const tools = [
     new HelloWorldTool(),

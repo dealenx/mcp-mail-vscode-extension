@@ -2,7 +2,7 @@
   "name": "mcp-mail-vscode-extension",
   "displayName": "MCP Mail for VS Code Copilot",
   "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
-  "version": "0.1.4",
+  "version": "0.1.10",
   "publisher": "dealenx",
   "repository": "https://github.com/Microsoft/vscode-extension-samples/helloworld-sample",
   "engines": {
@@ -13,7 +13,8 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onCommand:extension.helloWorld"
+    "onCommand:extension.helloWorld",
+    "onView:mcpMailTreeView"
   ],
   "main": "./out/extension.js",
   "scripts": {
@@ -31,6 +32,10 @@
         "title": "Hello World"
       },
       {
+        "command": "mcpMail.checkConnection",
+        "title": "MCP Mail: Проверь подключение"
+      },
+      {
         "command": "mcpMail.openSettings",
         "title": "MCP Mail: Открыть настройки"
       },
@@ -42,18 +47,18 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "mcpMailSidebarContainer",
+          "id": "mcpMailPanel",
           "title": "MCP Mail",
           "icon": "$(mail)"
         }
       ]
     },
     "views": {
-      "mcpMailSidebarContainer": [
+      "mcpMailPanel": [
         {
-          "id": "mcpMailSidebar",
+          "id": "mcpMailTreeView",
           "name": "MCP Mail",
-          "when": "true"
+          "icon": "$(mail)"
         }
       ]
     },
