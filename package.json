@@ -2,7 +2,7 @@
   "name": "mcp-mail-vscode-extension",
   "displayName": "MCP Mail for VS Code Copilot",
   "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
-  "version": "0.1.10",
+  "version": "0.2.0",
   "publisher": "dealenx",
   "repository": "https://github.com/Microsoft/vscode-extension-samples/helloworld-sample",
   "engines": {
