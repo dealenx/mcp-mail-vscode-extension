@@ -22,6 +22,7 @@ import {
   MailSendEmailTool,
   MailReplyToEmailTool,
 } from './mailTools';
+import { MailSidebarProvider, registerSidebarCommands } from './mailSidebar';
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('MCP Mail VS Code extension is now active!');
@@ -30,6 +31,13 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage('Hello World!');
   });
   context.subscriptions.push(disposable);
+
+  // Register sidebar
+  const mailSidebarProvider = new MailSidebarProvider();
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('mcpMailSidebar', mailSidebarProvider)
+  );
+  registerSidebarCommands(context);
 
   const tools = [
     new HelloWorldTool(),
