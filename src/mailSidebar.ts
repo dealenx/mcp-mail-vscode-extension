@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { mcpMailOutputChannel } from './logger';
+import { SentMailHistoryService } from './sentMail/historyService';
 
 export class MailSidebarProvider implements vscode.TreeDataProvider<MailSidebarItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<MailSidebarItem | undefined | null | void> =
@@ -70,7 +71,7 @@ export class MailSidebarItem extends vscode.TreeItem {
   }
 }
 
-export function registerSidebarCommands(context: vscode.ExtensionContext): void {
+export function registerSidebarCommands(context: vscode.ExtensionContext, sentMailHistory?: SentMailHistoryService): void {
   mcpMailOutputChannel.info('[MCP Mail] Registering sidebar commands...');
 
   context.subscriptions.push(
@@ -207,7 +208,7 @@ export function registerSidebarCommands(context: vscode.ExtensionContext): void 
           async () => {
             const client = new SMTPClient(config.SMTP);
             await client.connect();
-            await client.sendMail({
+            const result = await client.sendMail({
               from: config.SMTP.username,
               to: recipient,
               subject: 'Тестовое письмо — MCP Mail',
@@ -216,6 +217,23 @@ export function registerSidebarCommands(context: vscode.ExtensionContext): void 
             await client.disconnect();
             vscode.window.showInformationMessage(`✅ Тестовое письмо отправлено на ${recipient}`);
             mcpMailOutputChannel.info('[MCP Mail] Test email sent successfully');
+
+            // Save to local history
+            if (sentMailHistory) {
+              try {
+                await sentMailHistory.save({
+                  to: recipient,
+                  subject: 'Тестовое письмо — MCP Mail',
+                  text: 'Это тестовое письмо от расширения MCP Mail для VS Code.\n\nЕсли вы получили это письмо, значит SMTP-подключение работает корректно!',
+                  date: new Date().toISOString(),
+                  messageId: typeof result.messageId === 'string' ? result.messageId : undefined,
+                });
+                mcpMailOutputChannel.info('[MCP Mail] Test email saved to local history');
+              } catch (saveErr) {
+                const saveMsg = saveErr instanceof Error ? saveErr.message : String(saveErr);
+                mcpMailOutputChannel.error('[MCP Mail] Failed to save test email to history:', saveMsg);
+              }
+            }
           }
         );
       } catch (error) {

@@ -226,7 +226,7 @@
 
 ---
 
-### Task 7 — Unit-тесты для HistoryService
+### [x] Task 7 — Unit-тесты для HistoryService
 
 **Цель:** Покрыть CRUD-логику сервиса.
 

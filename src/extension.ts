@@ -57,7 +57,7 @@ export function activate(context: vscode.ExtensionContext) {
       })
     );
 
-    registerSidebarCommands(context);
+    registerSidebarCommands(context, sentMailHistory);
 
     // Set context key to make sidebar visible
     vscode.commands.executeCommand('setContext', 'mcpMail.extensionActive', true);
