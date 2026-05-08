@@ -10,30 +10,38 @@ export class SignatureEditorViewProvider implements vscode.WebviewViewProvider {
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ): void {
-    this._view = webviewView;
-    webviewView.webview.options = { enableScripts: true };
-    webviewView.webview.html = this._getHtml();
+    try {
+      mcpMailOutputChannel.info('[SignatureEditor] resolveWebviewView called');
+      this._view = webviewView;
+      webviewView.webview.options = { enableScripts: true };
+      webviewView.webview.html = this._getHtml();
+      mcpMailOutputChannel.info('[SignatureEditor] HTML set');
 
-    webviewView.webview.onDidReceiveMessage(async (message) => {
-      const config = vscode.workspace.getConfiguration('mcpMail');
-      switch (message.command) {
-        case 'getConfig':
-          webviewView.webview.postMessage({
-            command: 'config',
-            text: config.get<string>('signatureText', ''),
-            html: config.get<string>('signatureHtml', ''),
-            enabled: config.get<boolean>('signatureEnabled', true),
-          });
-          break;
-        case 'save':
-          await config.update('signatureText', message.text, true);
-          await config.update('signatureHtml', message.html, true);
-          await config.update('signatureEnabled', message.enabled, true);
-          mcpMailOutputChannel.info('[SignatureEditor] Signature saved');
-          webviewView.webview.postMessage({ command: 'saved' });
-          break;
-      }
-    });
+      webviewView.webview.onDidReceiveMessage(async (message) => {
+        mcpMailOutputChannel.info('[SignatureEditor] Message received:', message.command);
+        const config = vscode.workspace.getConfiguration('mcpMail');
+        switch (message.command) {
+          case 'getConfig':
+            webviewView.webview.postMessage({
+              command: 'config',
+              text: config.get<string>('signatureText', ''),
+              html: config.get<string>('signatureHtml', ''),
+              enabled: config.get<boolean>('signatureEnabled', true),
+            });
+            break;
+          case 'save':
+            await config.update('signatureText', message.text, true);
+            await config.update('signatureHtml', message.html, true);
+            await config.update('signatureEnabled', message.enabled, true);
+            mcpMailOutputChannel.info('[SignatureEditor] Signature saved');
+            webviewView.webview.postMessage({ command: 'saved' });
+            break;
+        }
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      mcpMailOutputChannel.error('[SignatureEditor] resolveWebviewView error:', msg);
+    }
   }
 
   private _getHtml(): string {
