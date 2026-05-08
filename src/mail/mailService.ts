@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { IMAPClient, EmailMessage, AttachmentData, AttachmentMeta } from './imap-client';
 import { SMTPClient, EmailOptions } from './smtp-client';
 import { getMailConfig, MailConfig } from './config';
+import { getSignatureConfig } from '../sentMail/signature';
+import { mcpMailOutputChannel } from '../logger';
 
 const COMMON_SENT_MAILBOX_NAMES = ['INBOX.Sent', 'Sent', 'SENT', 'Sent Items', 'Sent Messages', '已发送'];
 const COMMON_MAILBOX_NAMES = ['INBOX', ...COMMON_SENT_MAILBOX_NAMES];
@@ -417,6 +419,19 @@ export class MailService {
       throw new Error('Either text or html content is required');
     }
 
+    // Append signature if enabled
+    const sig = getSignatureConfig();
+    if (sig.enabled) {
+      if (emailOptions.text && sig.text) {
+        emailOptions.text += `\n\n---\n${sig.text}`;
+        mcpMailOutputChannel.info('[MailService] Text signature appended');
+      }
+      if (emailOptions.html && sig.html) {
+        emailOptions.html += `<br><br><hr>${sig.html}`;
+        mcpMailOutputChannel.info('[MailService] HTML signature appended');
+      }
+    }
+
     if (args.attachments && args.attachments.length > 0) {
       const fs = await import('fs/promises');
       const path = await import('path');
@@ -482,6 +497,19 @@ export class MailService {
       if (args.html || original.html) {
         const quotedHtml = `<div style="border-left: 3px solid #ccc; padding-left: 10px; margin-left: 10px; color: #666;"><p><strong>On ${originalDate}, ${original.from || 'Unknown Sender'} wrote:</strong></p><div>${(original.html || original.text || '').replace(/\n/g, '<br>')}</div></div>`;
         finalHtml = `${args.html || args.text?.replace(/\n/g, '<br>') || ''}<br><br>${quotedHtml}`;
+      }
+    }
+
+    // Append signature if enabled
+    const sig = getSignatureConfig();
+    if (sig.enabled) {
+      if (finalText && sig.text) {
+        finalText += `\n\n---\n${sig.text}`;
+        mcpMailOutputChannel.info('[MailService] Text signature appended to reply');
+      }
+      if (finalHtml && sig.html) {
+        finalHtml += `<br><br><hr>${sig.html}`;
+        mcpMailOutputChannel.info('[MailService] HTML signature appended to reply');
       }
     }
 
