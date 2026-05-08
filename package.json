@@ -2,7 +2,7 @@
   "name": "mcp-mail-vscode-extension",
   "displayName": "MCP Mail for VS Code Copilot",
   "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
-  "version": "0.4.8",
+  "version": "0.5.1",
   "publisher": "dealenx",
   "engines": {
     "vscode": "^1.100.0"
@@ -53,6 +53,10 @@
       {
         "command": "mcpMail.openSignatureEditor",
         "title": "MCP Mail: Редактор подписи"
+      },
+      {
+        "command": "mcpMail.openAttachmentEditor",
+        "title": "MCP Mail: Прикрепленные файлы"
       }
     ],
     "viewsContainers": {
@@ -141,6 +145,21 @@
           "default": true,
           "description": "Автоматически добавлять подпись к каждому отправляемому письму",
           "order": 11
+        },
+        "mcpMail.defaultAttachments": {
+          "type": "array",
+          "default": [],
+          "description": "Список абсолютных путей к файлам, которые автоматически прикрепляются к каждому отправляемому письму",
+          "items": {
+            "type": "string"
+          },
+          "order": 12
+        },
+        "mcpMail.defaultAttachmentsEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Автоматически прикреплять указанные файлы к каждому отправляемому письму",
+          "order": 13
         }
       }
     },

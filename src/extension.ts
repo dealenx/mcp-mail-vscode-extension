@@ -6,6 +6,7 @@ import { SentMailTreeDataProvider } from './sentMail/sentMailTreeView';
 import { getSentMailStoragePath, ensureStorageDir } from './sentMail/storage';
 import { openSentMailDetail } from './sentMail/sentMailDetailPanel';
 import { openSignatureEditorPanel } from './sentMail/signatureEditorPanel';
+import { openAttachmentEditorPanel } from './sentMail/attachmentEditorPanel';
 
 export function activate(context: vscode.ExtensionContext) {
   mcpMailOutputChannel.info('[MCP Mail] Extension activating...');
@@ -50,7 +51,13 @@ export function activate(context: vscode.ExtensionContext) {
       })
     );
 
-    // Register command to open sent mail detail
+    // Register command to open attachment editor panel
+    context.subscriptions.push(
+      vscode.commands.registerCommand('mcpMail.openAttachmentEditor', () => {
+        mcpMailOutputChannel.info('[MCP Mail] openAttachmentEditor command triggered');
+        openAttachmentEditorPanel();
+      })
+    );
     context.subscriptions.push(
       vscode.commands.registerCommand('mcpMail.openSentMail', async (id: string) => {
         if (!id) {

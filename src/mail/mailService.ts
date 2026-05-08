@@ -3,6 +3,7 @@ import { IMAPClient, EmailMessage, AttachmentData, AttachmentMeta } from './imap
 import { SMTPClient, EmailOptions } from './smtp-client';
 import { getMailConfig, MailConfig } from './config';
 import { getSignatureConfig, stripHtml } from '../sentMail/signature';
+import { getDefaultAttachmentsConfig } from '../sentMail/attachments';
 import { mcpMailOutputChannel } from '../logger';
 
 const COMMON_SENT_MAILBOX_NAMES = ['INBOX.Sent', 'Sent', 'SENT', 'Sent Items', 'Sent Messages', '已发送'];
@@ -443,6 +444,28 @@ export class MailService {
       emailOptions.attachments = attachmentList;
     }
 
+    // Append default attachments if enabled
+    const defaultAtt = getDefaultAttachmentsConfig();
+    if (defaultAtt.enabled && defaultAtt.files.length > 0) {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const existingPaths = new Set(emailOptions.attachments?.map(a => typeof a === 'object' && 'path' in a ? (a as any).path : '') || []);
+      const defaultList: Array<{ filename: string; content: string | Buffer; contentType?: string }> = emailOptions.attachments || [];
+      for (const filePath of defaultAtt.files) {
+        if (!existingPaths.has(filePath)) {
+          try {
+            const content = await fs.readFile(filePath);
+            defaultList.push({ filename: path.basename(filePath), content });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            mcpMailOutputChannel.warn(`[MailService] Failed to read default attachment ${filePath}:`, msg);
+          }
+        }
+      }
+      emailOptions.attachments = defaultList;
+      mcpMailOutputChannel.info(`[MailService] ${defaultAtt.files.length} default attachment(s) appended`);
+    }
+
     const result = await this.smtpClient!.sendMail(emailOptions);
     const sentFolderSaved = await this.saveSentMessage(emailOptions, result.messageId);
 
@@ -520,6 +543,25 @@ export class MailService {
       text: finalText,
       html: finalHtml,
     };
+
+    // Append default attachments if enabled
+    const defaultAttReply = getDefaultAttachmentsConfig();
+    if (defaultAttReply.enabled && defaultAttReply.files.length > 0) {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const attachmentList: Array<{ filename: string; content: Buffer; contentType?: string }> = [];
+      for (const filePath of defaultAttReply.files) {
+        try {
+          const content = await fs.readFile(filePath);
+          attachmentList.push({ filename: path.basename(filePath), content });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          mcpMailOutputChannel.warn(`[MailService] Failed to read default attachment ${filePath}:`, msg);
+        }
+      }
+      emailOptions.attachments = attachmentList;
+      mcpMailOutputChannel.info(`[MailService] ${defaultAttReply.files.length} default attachment(s) appended to reply`);
+    }
 
     const result = await this.smtpClient!.sendMail(emailOptions);
     const sentFolderSaved = await this.saveSentMessage(emailOptions, result.messageId);

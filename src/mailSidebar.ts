@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { mcpMailOutputChannel } from './logger';
 import { SentMailHistoryService } from './sentMail/historyService';
 import { getSignatureConfig, stripHtml } from './sentMail/signature';
+import { getDefaultAttachmentsConfig } from './sentMail/attachments';
 
 export class MailSidebarProvider implements vscode.TreeDataProvider<MailSidebarItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<MailSidebarItem | undefined | null | void> =
@@ -50,6 +51,13 @@ export class MailSidebarProvider implements vscode.TreeDataProvider<MailSidebarI
           'Открыть редактор подписи',
           vscode.TreeItemCollapsibleState.None,
           'edit'
+        ),
+        new MailSidebarItem(
+          'Прикрепленные файлы',
+          'mcpMail.openAttachmentEditor',
+          'Открыть редактор прикрепленных файлов',
+          vscode.TreeItemCollapsibleState.None,
+          'file'
         ),
       ];
       mcpMailOutputChannel.info('[MCP Mail] Returning', items.length, 'sidebar items');
@@ -225,12 +233,32 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
 
             const client = new SMTPClient(config.SMTP);
             await client.connect();
+
+            // Build default attachments for test email
+            const defaultAtt = getDefaultAttachmentsConfig();
+            const mailAttachments: Array<{ filename: string; content: Buffer }> = [];
+            if (defaultAtt.enabled && defaultAtt.files.length > 0) {
+              const fs = await import('fs/promises');
+              const path = await import('path');
+              for (const filePath of defaultAtt.files) {
+                try {
+                  const content = await fs.readFile(filePath);
+                  mailAttachments.push({ filename: path.basename(filePath), content });
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : String(err);
+                  mcpMailOutputChannel.warn(`[MCP Mail] Failed to read default attachment ${filePath}:`, msg);
+                }
+              }
+              mcpMailOutputChannel.info(`[MCP Mail] ${mailAttachments.length} default attachment(s) appended to test email`);
+            }
+
             const result = await client.sendMail({
               from: config.SMTP.username,
               to: recipient,
               subject: 'Тестовое письмо — MCP Mail',
               text: mailText,
               html: mailHtml,
+              attachments: mailAttachments.length > 0 ? mailAttachments : undefined,
             });
             await client.disconnect();
             vscode.window.showInformationMessage(`✅ Тестовое письмо отправлено на ${recipient}`);
@@ -245,6 +273,7 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
                   subject: 'Тестовое письмо — MCP Mail',
                   text: mailText,
                   html: mailHtml,
+                  attachments: defaultAtt.enabled ? defaultAtt.files : undefined,
                   date: new Date().toISOString(),
                   messageId: typeof result.messageId === 'string' ? result.messageId : undefined,
                 });
