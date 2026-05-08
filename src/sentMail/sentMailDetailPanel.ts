@@ -28,6 +28,9 @@ export function openSentMailDetail(record: SentMailRecord): void {
   });
 
   const metaRows: string[] = [];
+  if (record.from) {
+    metaRows.push(`<tr><td class="label">От кого:</td><td class="value">${escapeHtml(record.from)}</td></tr>`);
+  }
   metaRows.push(`<tr><td class="label">Кому:</td><td class="value">${escapeHtml(record.to)}</td></tr>`);
   if (record.cc) {
     metaRows.push(`<tr><td class="label">Копия:</td><td class="value">${escapeHtml(record.cc)}</td></tr>`);

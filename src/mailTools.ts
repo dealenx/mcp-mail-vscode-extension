@@ -302,6 +302,7 @@ export class MailSendEmailTool extends Tool {
 
     const resultObj = result as Record<string, unknown>;
     await saveSentMailRecord({
+      from: typeof resultObj.from === 'string' ? resultObj.from : undefined,
       to: input.to,
       subject: input.subject,
       text: input.text,
@@ -340,6 +341,7 @@ export class MailReplyToEmailTool extends Tool {
 
     const resultObj = result as Record<string, unknown>;
     await saveSentMailRecord({
+      from: typeof resultObj.from === 'string' ? resultObj.from : undefined,
       to: typeof resultObj.to === 'string' ? resultObj.to : (resultObj.replyTo as string) || '',
       subject: typeof resultObj.subject === 'string' ? resultObj.subject : '',
       text: input.text,

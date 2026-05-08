@@ -1,5 +1,6 @@
 export interface SentMailRecord {
   id?: string;
+  from?: string;
   to: string;
   subject: string;
   text?: string;

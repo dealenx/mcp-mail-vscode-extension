@@ -222,6 +222,7 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
             if (sentMailHistory) {
               try {
                 await sentMailHistory.save({
+                  from: config.SMTP.username,
                   to: recipient,
                   subject: 'Тестовое письмо — MCP Mail',
                   text: 'Это тестовое письмо от расширения MCP Mail для VS Code.\n\nЕсли вы получили это письмо, значит SMTP-подключение работает корректно!',

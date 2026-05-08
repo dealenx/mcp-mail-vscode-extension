@@ -27,14 +27,19 @@ function stripHtml(html: string): string {
 function makePreview(record: SentMailRecord): string {
   const raw = record.text || record.html || '';
   const text = record.html ? stripHtml(raw) : raw;
-  return text.length > 200 ? text.substring(0, 200) + '…' : text;
+  const preview = text.length > 200 ? text.substring(0, 200) + '…' : text;
+  if (record.from) {
+    return `От: ${record.from}\n${preview}`;
+  }
+  return preview;
 }
 
 export class SentMailTreeItem extends vscode.TreeItem {
   constructor(record: SentMailRecord) {
     const label = record.subject || '(без темы)';
     super(label, vscode.TreeItemCollapsibleState.None);
-    this.description = `${record.to}  •  ${relativeTime(record.date)}`;
+    const fromPart = record.from ? `${record.from} → ` : '';
+    this.description = `${fromPart}${record.to}  •  ${relativeTime(record.date)}`;
     this.tooltip = makePreview(record);
     this.iconPath = new vscode.ThemeIcon('mail');
     this.command = {

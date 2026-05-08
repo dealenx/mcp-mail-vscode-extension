@@ -434,6 +434,7 @@ export class MailService {
     return {
       ...result,
       sentFolderSaved,
+      from: config.SMTP.username,
     };
   }
 
@@ -502,6 +503,7 @@ export class MailService {
       sentFolderSaved,
       subject,
       to: originalFrom,
+      from: config.SMTP.username,
     };
   }
 
