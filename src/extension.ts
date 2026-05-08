@@ -5,7 +5,7 @@ import { SentMailHistoryService } from './sentMail/historyService';
 import { SentMailTreeDataProvider } from './sentMail/sentMailTreeView';
 import { getSentMailStoragePath, ensureStorageDir } from './sentMail/storage';
 import { openSentMailDetail } from './sentMail/sentMailDetailPanel';
-import { SignatureEditorViewProvider } from './sentMail/signatureEditorView';
+import { openSignatureEditorPanel } from './sentMail/signatureEditorPanel';
 
 export function activate(context: vscode.ExtensionContext) {
   mcpMailOutputChannel.info('[MCP Mail] Extension activating...');
@@ -42,15 +42,13 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push({ dispose: () => sentMailProvider.dispose() });
     mcpMailOutputChannel.info('[MCP Mail] Sent Mail TreeView registered');
 
-    // Register signature editor webview panel
-    const signatureEditorProvider = new SignatureEditorViewProvider();
+    // Register command to open signature editor panel
     context.subscriptions.push(
-      vscode.window.registerWebviewViewProvider(
-        SignatureEditorViewProvider.viewType,
-        signatureEditorProvider
-      )
+      vscode.commands.registerCommand('mcpMail.openSignatureEditor', () => {
+        mcpMailOutputChannel.info('[MCP Mail] openSignatureEditor command triggered');
+        openSignatureEditorPanel();
+      })
     );
-    mcpMailOutputChannel.info('[MCP Mail] Signature editor view registered');
 
     // Register command to open sent mail detail
     context.subscriptions.push(

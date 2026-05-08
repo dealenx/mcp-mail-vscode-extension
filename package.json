@@ -2,7 +2,7 @@
   "name": "mcp-mail-vscode-extension",
   "displayName": "MCP Mail for VS Code Copilot",
   "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "publisher": "dealenx",
   "engines": {
     "vscode": "^1.100.0"
@@ -12,10 +12,7 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onCommand:extension.helloWorld",
-    "onView:mcpMailTreeView",
-    "onView:mcpMailSentMailView",
-    "onView:mcpMailSignatureEditor"
+    "onCommand:extension.helloWorld"
   ],
   "main": "./out/extension.js",
   "scripts": {
@@ -54,8 +51,8 @@
         "title": "MCP Mail: Открыть отправленное письмо"
       },
       {
-        "command": "mcpMail.openSignatureSettings",
-        "title": "MCP Mail: Настроить подпись"
+        "command": "mcpMail.openSignatureEditor",
+        "title": "MCP Mail: Редактор подписи"
       }
     ],
     "viewsContainers": {
@@ -78,12 +75,6 @@
           "id": "mcpMailSentMailView",
           "name": "Отправленные",
           "icon": "$(mail)"
-        },
-        {
-          "id": "mcpMailSignatureEditor",
-          "name": "Подпись",
-          "icon": "$(edit)",
-          "type": "webview"
         }
       ]
     },

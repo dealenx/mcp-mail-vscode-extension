@@ -46,8 +46,8 @@ export class MailSidebarProvider implements vscode.TreeDataProvider<MailSidebarI
         ),
         new MailSidebarItem(
           'Настроить подпись',
-          'mcpMail.openSignatureSettings',
-          'Настроить подпись для email',
+          'mcpMail.openSignatureEditor',
+          'Открыть редактор подписи',
           vscode.TreeItemCollapsibleState.None,
           'edit'
         ),
@@ -257,13 +257,6 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
         mcpMailOutputChannel.error('[MCP Mail] sendTestEmail error:', msg);
         vscode.window.showErrorMessage(`❌ Ошибка отправки: ${msg}`);
       }
-    })
-  );
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand('mcpMail.openSignatureSettings', () => {
-      mcpMailOutputChannel.info('[MCP Mail] openSignatureSettings command triggered');
-      vscode.commands.executeCommand('workbench.action.openSettings', 'mcpMail.signature');
     })
   );
 
