@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { IMAPClient, EmailMessage, AttachmentData, AttachmentMeta } from './imap-client';
 import { SMTPClient, EmailOptions } from './smtp-client';
 import { getMailConfig, MailConfig } from './config';
-import { getSignatureConfig } from '../sentMail/signature';
+import { getSignatureConfig, stripHtml } from '../sentMail/signature';
 import { mcpMailOutputChannel } from '../logger';
 
 const COMMON_SENT_MAILBOX_NAMES = ['INBOX.Sent', 'Sent', 'SENT', 'Sent Items', 'Sent Messages', '已发送'];
@@ -421,14 +421,14 @@ export class MailService {
 
     // Append signature if enabled
     const sig = getSignatureConfig();
-    if (sig.enabled) {
-      if (emailOptions.text && sig.text) {
-        emailOptions.text += `\n\n---\n${sig.text}`;
-        mcpMailOutputChannel.info('[MailService] Text signature appended');
-      }
-      if (emailOptions.html && sig.html) {
+    if (sig.enabled && sig.html) {
+      if (emailOptions.html) {
         emailOptions.html += `<br><br><hr>${sig.html}`;
         mcpMailOutputChannel.info('[MailService] HTML signature appended');
+      }
+      if (emailOptions.text) {
+        emailOptions.text += `\n\n---\n${stripHtml(sig.html)}`;
+        mcpMailOutputChannel.info('[MailService] Text signature appended (from HTML)');
       }
     }
 
@@ -502,14 +502,14 @@ export class MailService {
 
     // Append signature if enabled
     const sig = getSignatureConfig();
-    if (sig.enabled) {
-      if (finalText && sig.text) {
-        finalText += `\n\n---\n${sig.text}`;
-        mcpMailOutputChannel.info('[MailService] Text signature appended to reply');
-      }
-      if (finalHtml && sig.html) {
+    if (sig.enabled && sig.html) {
+      if (finalHtml) {
         finalHtml += `<br><br><hr>${sig.html}`;
         mcpMailOutputChannel.info('[MailService] HTML signature appended to reply');
+      }
+      if (finalText) {
+        finalText += `\n\n---\n${stripHtml(sig.html)}`;
+        mcpMailOutputChannel.info('[MailService] Text signature appended to reply (from HTML)');
       }
     }
 

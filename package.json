@@ -2,7 +2,7 @@
   "name": "mcp-mail-vscode-extension",
   "displayName": "MCP Mail for VS Code Copilot",
   "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "publisher": "dealenx",
   "engines": {
     "vscode": "^1.100.0"
@@ -129,19 +129,12 @@
           "description": "Пароль почты (используется для IMAP и SMTP)",
           "order": 8
         },
-        "mcpMail.signatureText": {
+        "mcpMail.signature": {
           "type": "string",
           "default": "",
-          "description": "Подпись в plain text формате (будет добавлена в конец каждого письма)",
+          "description": "HTML подпись для email. Для plain text писем HTML-теги автоматически удалятся.",
           "editPresentation": "multilineText",
           "order": 9
-        },
-        "mcpMail.signatureHtml": {
-          "type": "string",
-          "default": "",
-          "description": "Подпись в HTML формате (поддерживает ссылки, изображения, стили)",
-          "editPresentation": "multilineText",
-          "order": 10
         },
         "mcpMail.signatureEnabled": {
           "type": "boolean",

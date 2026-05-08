@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { mcpMailOutputChannel } from './logger';
 import { SentMailHistoryService } from './sentMail/historyService';
-import { getSignatureConfig } from './sentMail/signature';
+import { getSignatureConfig, stripHtml } from './sentMail/signature';
 
 export class MailSidebarProvider implements vscode.TreeDataProvider<MailSidebarItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<MailSidebarItem | undefined | null | void> =
@@ -216,8 +216,8 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
           async () => {
             const sig = getSignatureConfig();
             let mailText = 'Это тестовое письмо от расширения MCP Mail для VS Code.\n\nЕсли вы получили это письмо, значит SMTP-подключение работает корректно!';
-            if (sig.enabled && sig.text) {
-              mailText += `\n\n---\n${sig.text}`;
+            if (sig.enabled && sig.html) {
+              mailText += `\n\n---\n${stripHtml(sig.html)}`;
               mcpMailOutputChannel.info('[MCP Mail] Signature appended to test email');
             }
 

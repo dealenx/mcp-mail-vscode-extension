@@ -36,7 +36,7 @@ function getHtml(): string {
     }
     textarea {
       width: 100%;
-      min-height: 120px;
+      min-height: 160px;
       background: var(--vscode-input-background);
       color: var(--vscode-input-foreground);
       border: 1px solid var(--vscode-input-border);
@@ -50,7 +50,8 @@ function getHtml(): string {
     .hint {
       font-size: 12px;
       color: var(--vscode-descriptionForeground);
-      margin-top: 4px;
+      margin-top: 6px;
+      line-height: 1.4;
     }
     .checkbox-row {
       display: flex;
@@ -127,15 +128,12 @@ function getHtml(): string {
   <h2>✉️ Редактор подписи</h2>
 
   <div class="section">
-    <label for="sigText">Plain text подпись</label>
-    <textarea id="sigText" placeholder="С уважением, Андрей Бумагин&#10;Основатель &amp; CEO, MimikkAI&#10;&#10;mimikkai.ru"></textarea>
-    <div class="hint">Будет добавлена в конец plain text писем</div>
-  </div>
-
-  <div class="section">
-    <label for="sigHtml">HTML подпись</label>
-    <textarea id="sigHtml" placeholder="&lt;p&gt;С уважением, &lt;b&gt;Андрей Бумагин&lt;/b&gt;&lt;/p&gt;&#10;&lt;p&gt;Основатель &amp; CEO, MimikkAI&lt;/p&gt;&#10;&lt;p&gt;&lt;a href='https://mimikkai.ru'&gt;mimikkai.ru&lt;/a&gt;&lt;/p&gt;"></textarea>
-    <div class="hint">Поддерживает HTML: ссылки, изображения, стили. Будет добавлена в HTML письма.</div>
+    <label for="sigHtml">Ваша подпись (поддерживает HTML)</label>
+    <textarea id="sigHtml" placeholder="&lt;p&gt;С уважением, &lt;b&gt;Иван Васильев&lt;/b&gt;&lt;/p&gt;&#10;&lt;p&gt;Основатель Организации&lt;/p&gt;&#10;&lt;p&gt;&lt;a href='https://example.ru'&gt;example.ru&lt;/a&gt;&lt;/p&gt;"></textarea>
+    <div class="hint">
+      ✏️ HTML-теги: &lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;, &lt;a href="..."&gt;ссылка&lt;/a&gt;, &lt;img src="..."&gt;<br>
+      Для обычных text писем HTML-теги автоматически удалятся.
+    </div>
   </div>
 
   <div class="checkbox-row">
@@ -151,13 +149,12 @@ function getHtml(): string {
   <div class="status" id="status"></div>
 
   <div class="preview" id="previewBox" style="display:none">
-    <div class="preview-title">Предпросмотр HTML подписи:</div>
+    <div class="preview-title">Предпросмотр подписи:</div>
     <div id="previewContent"></div>
   </div>
 
   <script>
     const vscode = acquireVsCodeApi();
-    const sigText = document.getElementById('sigText');
     const sigHtml = document.getElementById('sigHtml');
     const sigEnabled = document.getElementById('sigEnabled');
     const saveBtn = document.getElementById('saveBtn');
@@ -172,7 +169,6 @@ function getHtml(): string {
     window.addEventListener('message', (event) => {
       const msg = event.data;
       if (msg.command === 'config') {
-        sigText.value = msg.text || '';
         sigHtml.value = msg.html || '';
         sigEnabled.checked = msg.enabled;
       }
@@ -191,7 +187,6 @@ function getHtml(): string {
       status.className = 'status';
       vscode.postMessage({
         command: 'save',
-        text: sigText.value,
         html: sigHtml.value,
         enabled: sigEnabled.checked,
       });
@@ -200,9 +195,6 @@ function getHtml(): string {
     previewBtn.addEventListener('click', () => {
       if (sigHtml.value.trim()) {
         previewContent.innerHTML = sigHtml.value;
-        previewBox.style.display = 'block';
-      } else if (sigText.value.trim()) {
-        previewContent.innerText = sigText.value;
         previewBox.style.display = 'block';
       } else {
         status.textContent = 'Нет данных для предпросмотра';
@@ -230,14 +222,12 @@ export function openSignatureEditorPanel(): void {
       case 'getConfig':
         panel.webview.postMessage({
           command: 'config',
-          text: config.get<string>('signatureText', ''),
-          html: config.get<string>('signatureHtml', ''),
+          html: config.get<string>('signature', ''),
           enabled: config.get<boolean>('signatureEnabled', true),
         });
         break;
       case 'save':
-        await config.update('signatureText', message.text, true);
-        await config.update('signatureHtml', message.html, true);
+        await config.update('signature', message.html, true);
         await config.update('signatureEnabled', message.enabled, true);
         mcpMailOutputChannel.info('[SignatureEditor] Signature saved via panel');
         panel.webview.postMessage({ command: 'saved' });
