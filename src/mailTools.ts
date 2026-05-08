@@ -1,8 +1,31 @@
 import * as vscode from 'vscode';
 import { Tool } from './tool';
 import { MailService } from './mail/mailService';
+import { SentMailHistoryService } from './sentMail/historyService';
+import { SentMailRecord } from './sentMail/types';
+import { mcpMailOutputChannel } from './logger';
 
 const mailService = new MailService();
+let sentMailHistory: SentMailHistoryService | null = null;
+
+export function setSentMailHistory(service: SentMailHistoryService): void {
+  sentMailHistory = service;
+  mcpMailOutputChannel.info('[MailTools] SentMailHistoryService registered');
+}
+
+async function saveSentMailRecord(record: SentMailRecord): Promise<void> {
+  if (!sentMailHistory) {
+    mcpMailOutputChannel.warn('[MailTools] SentMailHistoryService not set, skipping local save');
+    return;
+  }
+  try {
+    await sentMailHistory.save(record);
+    mcpMailOutputChannel.info('[MailTools] Sent mail saved locally:', record.id);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    mcpMailOutputChannel.error('[MailTools] Failed to save sent mail locally:', msg);
+  }
+}
 
 /**
  * Сохраняет base64-вложения во временные файлы и возвращает их пути.
@@ -276,6 +299,20 @@ export class MailSendEmailTool extends Tool {
       bcc: input.bcc,
       attachments: input.attachments,
     });
+
+    const resultObj = result as Record<string, unknown>;
+    await saveSentMailRecord({
+      to: input.to,
+      subject: input.subject,
+      text: input.text,
+      html: input.html,
+      cc: input.cc,
+      bcc: input.bcc,
+      attachments: input.attachments,
+      date: new Date().toISOString(),
+      messageId: typeof resultObj.messageId === 'string' ? resultObj.messageId : undefined,
+    });
+
     return JSON.stringify(result, null, 2);
   }
 }
@@ -300,6 +337,17 @@ export class MailReplyToEmailTool extends Tool {
       replyToAll: input.replyToAll,
       includeOriginal: input.includeOriginal,
     });
+
+    const resultObj = result as Record<string, unknown>;
+    await saveSentMailRecord({
+      to: typeof resultObj.to === 'string' ? resultObj.to : (resultObj.replyTo as string) || '',
+      subject: typeof resultObj.subject === 'string' ? resultObj.subject : '',
+      text: input.text,
+      html: input.html,
+      date: new Date().toISOString(),
+      messageId: typeof resultObj.messageId === 'string' ? resultObj.messageId : undefined,
+    });
+
     return JSON.stringify(result, null, 2);
   }
 }

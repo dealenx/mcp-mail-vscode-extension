@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
 import { mcpMailOutputChannel } from './logger';
 import { MailSidebarProvider, registerSidebarCommands } from './mailSidebar';
+import { SentMailHistoryService } from './sentMail/historyService';
+import { SentMailTreeDataProvider } from './sentMail/sentMailTreeView';
+import { getSentMailStorageUri, ensureStorageDir } from './sentMail/storage';
+import { openSentMailDetail } from './sentMail/sentMailDetailPanel';
 
 export function activate(context: vscode.ExtensionContext) {
   mcpMailOutputChannel.info('[MCP Mail] Extension activating...');
@@ -21,6 +25,38 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(treeView);
     mcpMailOutputChannel.info('[MCP Mail] TreeView registered successfully');
 
+    // Sent Mail history + TreeView
+    mcpMailOutputChannel.info('[MCP Mail] Initializing Sent Mail storage...');
+    const sentMailStorageUri = getSentMailStorageUri(context);
+    ensureStorageDir(sentMailStorageUri).catch((err) => {
+      mcpMailOutputChannel.error('[MCP Mail] Failed to ensure sent mail storage:', String(err));
+    });
+    const sentMailHistory = new SentMailHistoryService(sentMailStorageUri);
+    const sentMailProvider = new SentMailTreeDataProvider(sentMailHistory);
+    const sentMailTreeView = vscode.window.createTreeView('mcpMailSentMailView', {
+      treeDataProvider: sentMailProvider,
+      showCollapseAll: false,
+    });
+    context.subscriptions.push(sentMailTreeView);
+    context.subscriptions.push({ dispose: () => sentMailProvider.dispose() });
+    mcpMailOutputChannel.info('[MCP Mail] Sent Mail TreeView registered');
+
+    // Register command to open sent mail detail
+    context.subscriptions.push(
+      vscode.commands.registerCommand('mcpMail.openSentMail', async (id: string) => {
+        if (!id) {
+          vscode.window.showWarningMessage('Не удалось определить ID письма');
+          return;
+        }
+        const record = await sentMailHistory.load(id);
+        if (record) {
+          openSentMailDetail(record);
+        } else {
+          vscode.window.showWarningMessage(`Отправленное письмо с ID ${id} не найдено`);
+        }
+      })
+    );
+
     registerSidebarCommands(context);
 
     // Set context key to make sidebar visible
@@ -30,12 +66,16 @@ export function activate(context: vscode.ExtensionContext) {
     setTimeout(() => {
       mcpMailOutputChannel.info('[MCP Mail] Triggering initial refresh');
       mailSidebarProvider.refresh();
+      sentMailProvider.refresh();
     }, 500);
 
     // Register tools separately - sidebar should work even if tools fail
     try {
       const { HelloWorldTool } = require('./helloWorldTool');
       const mailTools = require('./mailTools');
+
+      // Inject SentMailHistoryService into mail tools
+      mailTools.setSentMailHistory(sentMailHistory);
 
       const tools = [
         new HelloWorldTool(),

@@ -500,6 +500,8 @@ export class MailService {
       replyTo: originalFrom,
       replyToAll: args.replyToAll || false,
       sentFolderSaved,
+      subject,
+      to: originalFrom,
     };
   }
 
