@@ -423,7 +423,7 @@ export class MailService {
     const sig = getSignatureConfig();
     if (sig.enabled && sig.html) {
       if (emailOptions.html) {
-        emailOptions.html += `<br><br><hr>${sig.html}`;
+        emailOptions.html += `<br><br><hr><div style="white-space: pre-wrap; word-break: break-word;">${sig.html}</div>`;
         mcpMailOutputChannel.info('[MailService] HTML signature appended');
       }
       if (emailOptions.text) {
@@ -504,7 +504,7 @@ export class MailService {
     const sig = getSignatureConfig();
     if (sig.enabled && sig.html) {
       if (finalHtml) {
-        finalHtml += `<br><br><hr>${sig.html}`;
+        finalHtml += `<br><br><hr><div style="white-space: pre-wrap; word-break: break-word;">${sig.html}</div>`;
         mcpMailOutputChannel.info('[MailService] HTML signature appended to reply');
       }
       if (finalText) {

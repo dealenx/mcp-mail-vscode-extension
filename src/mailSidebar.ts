@@ -216,8 +216,10 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
           async () => {
             const sig = getSignatureConfig();
             let mailText = 'Это тестовое письмо от расширения MCP Mail для VS Code.\n\nЕсли вы получили это письмо, значит SMTP-подключение работает корректно!';
+            let mailHtml = '<p>Это тестовое письмо от расширения MCP Mail для VS Code.</p><p>Если вы получили это письмо, значит SMTP-подключение работает корректно!</p>';
             if (sig.enabled && sig.html) {
               mailText += `\n\n---\n${stripHtml(sig.html)}`;
+              mailHtml += `<br><br><hr><div style="white-space: pre-wrap; word-break: break-word;">${sig.html}</div>`;
               mcpMailOutputChannel.info('[MCP Mail] Signature appended to test email');
             }
 
@@ -228,6 +230,7 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
               to: recipient,
               subject: 'Тестовое письмо — MCP Mail',
               text: mailText,
+              html: mailHtml,
             });
             await client.disconnect();
             vscode.window.showInformationMessage(`✅ Тестовое письмо отправлено на ${recipient}`);
@@ -241,6 +244,7 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
                   to: recipient,
                   subject: 'Тестовое письмо — MCP Mail',
                   text: mailText,
+                  html: mailHtml,
                   date: new Date().toISOString(),
                   messageId: typeof result.messageId === 'string' ? result.messageId : undefined,
                 });

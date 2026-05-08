@@ -122,6 +122,10 @@ function getHtml(): string {
       font-size: 13px;
       color: var(--vscode-descriptionForeground);
     }
+    #previewContent {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
