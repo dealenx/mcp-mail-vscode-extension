@@ -3,7 +3,7 @@ import { mcpMailOutputChannel } from './logger';
 import { MailSidebarProvider, registerSidebarCommands } from './mailSidebar';
 import { SentMailHistoryService } from './sentMail/historyService';
 import { SentMailTreeDataProvider } from './sentMail/sentMailTreeView';
-import { getSentMailStorageUri, ensureStorageDir } from './sentMail/storage';
+import { getSentMailStoragePath, ensureStorageDir } from './sentMail/storage';
 import { openSentMailDetail } from './sentMail/sentMailDetailPanel';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -27,7 +27,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Sent Mail history + TreeView
     mcpMailOutputChannel.info('[MCP Mail] Initializing Sent Mail storage...');
-    const sentMailStorageUri = getSentMailStorageUri(context);
+    const sentMailStorageUri = getSentMailStoragePath(context);
     ensureStorageDir(sentMailStorageUri).catch((err) => {
       mcpMailOutputChannel.error('[MCP Mail] Failed to ensure sent mail storage:', String(err));
     });

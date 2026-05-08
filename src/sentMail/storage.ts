@@ -4,22 +4,23 @@ import { mcpMailOutputChannel } from '../logger';
 const SENT_MAIL_DIR = 'sent-emails';
 
 /**
- * Возвращает URI директории для хранения отправленных писем.
+ * Возвращает путь к директории для хранения отправленных писем.
  */
-export function getSentMailStorageUri(context: vscode.ExtensionContext): vscode.Uri {
-  return vscode.Uri.joinPath(context.globalStorageUri, SENT_MAIL_DIR);
+export function getSentMailStoragePath(context: vscode.ExtensionContext): string {
+  return vscode.Uri.joinPath(context.globalStorageUri, SENT_MAIL_DIR).fsPath;
 }
 
 /**
  * Создаёт директорию хранилища, если она не существует.
  */
-export async function ensureStorageDir(uri: vscode.Uri): Promise<void> {
+export async function ensureStorageDir(dirPath: string): Promise<void> {
   try {
-    await vscode.workspace.fs.createDirectory(uri);
-    mcpMailOutputChannel.info(`[SentMailStorage] Directory ensured: ${uri.fsPath}`);
+    const fs = await import('fs/promises');
+    await fs.mkdir(dirPath, { recursive: true });
+    mcpMailOutputChannel.info(`[SentMailStorage] Directory ensured: ${dirPath}`);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    mcpMailOutputChannel.error(`[SentMailStorage] Failed to ensure directory ${uri.fsPath}:`, msg);
+    mcpMailOutputChannel.error(`[SentMailStorage] Failed to ensure directory ${dirPath}:`, msg);
     throw new Error(`Failed to ensure sent-mail storage directory: ${msg}`);
   }
 }
