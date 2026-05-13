@@ -4,6 +4,7 @@ import { SMTPClient, EmailOptions } from './smtp-client';
 import { getMailConfig, MailConfig } from './config';
 import { getSignatureConfig, stripHtml } from '../sentMail/signature';
 import { getDefaultAttachmentsConfig } from '../sentMail/attachments';
+import { CancellationError, throwIfCancelled } from '../cancellation';
 import { mcpMailOutputChannel } from '../logger';
 
 const COMMON_SENT_MAILBOX_NAMES = ['INBOX.Sent', 'Sent', 'SENT', 'Sent Items', 'Sent Messages', '已发送'];
@@ -59,12 +60,13 @@ export class MailService {
     }
   }
 
-  async ensureSMTPConnection(): Promise<void> {
+  async ensureSMTPConnection(signal?: AbortSignal): Promise<void> {
     if (this.smtpClient) return;
     if (this.isSmtpInitializing) {
       const deadline = Date.now() + 30000;
       while (this.isSmtpInitializing) {
         if (Date.now() > deadline) throw new Error('SMTP connection initialization timed out');
+        throwIfCancelled(signal!);
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
       if (!this.smtpClient) throw new Error('SMTP connection initialization failed');
@@ -403,8 +405,9 @@ export class MailService {
     cc?: string;
     bcc?: string;
     attachments?: string[];
-  }): Promise<object> {
-    await this.ensureSMTPConnection();
+  }, signal?: AbortSignal): Promise<object> {
+    await this.ensureSMTPConnection(signal);
+    throwIfCancelled(signal!);
     const config = getMailConfig();
 
     const emailOptions: EmailOptions = {
@@ -466,8 +469,10 @@ export class MailService {
       mcpMailOutputChannel.info(`[MailService] ${defaultAtt.files.length} default attachment(s) appended`);
     }
 
-    const result = await this.smtpClient!.sendMail(emailOptions);
-    const sentFolderSaved = await this.saveSentMessage(emailOptions, result.messageId);
+    const result = await this.smtpClient!.sendMail(emailOptions, signal);
+    mcpMailOutputChannel.info('[FIX] sendEmail succeeded', { messageId: result.messageId });
+    throwIfCancelled(signal!);
+    const sentFolderSaved = await this.saveSentMessage(emailOptions, result.messageId, signal);
 
     return {
       ...result,
@@ -482,8 +487,9 @@ export class MailService {
     html?: string;
     replyToAll?: boolean;
     includeOriginal?: boolean;
-  }): Promise<object> {
+  }, signal?: AbortSignal): Promise<object> {
     await this.ensureRequiredConnections(true, true);
+    throwIfCancelled(signal!);
     const original = await this.getMessage(args.originalUid);
     if (!original) throw new Error(`Original message with UID ${args.originalUid} not found`);
 
@@ -563,8 +569,10 @@ export class MailService {
       mcpMailOutputChannel.info(`[MailService] ${defaultAttReply.files.length} default attachment(s) appended to reply`);
     }
 
-    const result = await this.smtpClient!.sendMail(emailOptions);
-    const sentFolderSaved = await this.saveSentMessage(emailOptions, result.messageId);
+    const result = await this.smtpClient!.sendMail(emailOptions, signal);
+    mcpMailOutputChannel.info('[FIX] replyToEmail succeeded', { messageId: result.messageId });
+    throwIfCancelled(signal!);
+    const sentFolderSaved = await this.saveSentMessage(emailOptions, result.messageId, signal);
 
     return {
       ...result,
@@ -577,9 +585,11 @@ export class MailService {
     };
   }
 
-  private async saveSentMessage(emailOptions: EmailOptions, messageId?: string): Promise<boolean> {
+  private async saveSentMessage(emailOptions: EmailOptions, messageId?: string, signal?: AbortSignal): Promise<boolean> {
     try {
+      throwIfCancelled(signal!);
       await this.ensureIMAPConnection();
+      throwIfCancelled(signal!);
       const sentFolder = await this.findSentMailbox();
       if (!sentFolder) return false;
       const rawMessage = this.buildRawEmailMessage(emailOptions, messageId);

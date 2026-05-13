@@ -2,7 +2,7 @@
   "name": "mcp-mail-vscode-extension",
   "displayName": "MCP Mail for VS Code Copilot",
   "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "publisher": "dealenx",
   "engines": {
     "vscode": "^1.100.0"
@@ -21,7 +21,7 @@
     "lint": "eslint",
     "build": "npm run compile",
     "watch": "tsc -watch -p ./",
-    "test": "npx tsc src/test/sentMail/historyService.test.ts --outDir out/test --module commonjs --target ES2024 --lib ES2024 --esModuleInterop --allowSyntheticDefaultImports --strict --skipLibCheck --moduleResolution node && npx mocha out/test/test/sentMail/historyService.test.js",
+    "test": "npx tsc src/test/sentMail/historyService.test.ts src/test/mail/cancellation.test.ts src/test/mail/smtpClient.test.ts --outDir out/test --module commonjs --target ES2024 --lib ES2024 --esModuleInterop --allowSyntheticDefaultImports --strict --skipLibCheck --moduleResolution node && npx mocha out/test/test/sentMail/historyService.test.js out/test/test/mail/cancellation.test.js out/test/test/mail/smtpClient.test.js",
     "package": "npx vsce package --allow-missing-repository"
   },
   "contributes": {

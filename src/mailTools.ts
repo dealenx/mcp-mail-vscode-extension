@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { Tool } from './tool';
+import { Tool, createAbortController } from './tool';
+import { CancellationError } from './cancellation';
 import { MailService } from './mail/mailService';
 import { SentMailHistoryService } from './sentMail/historyService';
 import { SentMailRecord } from './sentMail/types';
@@ -50,18 +51,23 @@ async function saveAttachmentsToTemp(
 export class MailConnectTool extends Tool {
   public readonly toolName = 'mail_connect_all';
 
-  async call(_options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
+  async call(_options: vscode.LanguageModelToolInvocationOptions<object>, token: vscode.CancellationToken): Promise<string> {
+    const { signal } = createAbortController(token);
     const results: string[] = [];
     try {
+      if (signal.aborted) throw new CancellationError();
       await mailService.ensureIMAPConnection();
       results.push('✅ IMAP: Connected successfully');
     } catch (e) {
+      if (e instanceof CancellationError) throw e;
       results.push(`❌ IMAP: ${e instanceof Error ? e.message : String(e)}`);
     }
     try {
-      await mailService.ensureSMTPConnection();
+      if (signal.aborted) throw new CancellationError();
+      await mailService.ensureSMTPConnection(signal);
       results.push('✅ SMTP: Connected successfully');
     } catch (e) {
+      if (e instanceof CancellationError) throw e;
       results.push(`❌ SMTP: ${e instanceof Error ? e.message : String(e)}`);
     }
     return JSON.stringify({ results }, null, 2);
@@ -277,7 +283,7 @@ export class MailSaveAttachmentTool extends Tool {
 export class MailSendEmailTool extends Tool {
   public readonly toolName = 'mail_send_email';
 
-  async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
+  async call(options: vscode.LanguageModelToolInvocationOptions<object>, token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as {
       to?: string;
       subject?: string;
@@ -290,6 +296,8 @@ export class MailSendEmailTool extends Tool {
     if (!input.to) throw new Error('to is required');
     if (!input.subject) throw new Error('subject is required');
     if (!input.text && !input.html) throw new Error('Either text or html content is required');
+
+    const { signal } = createAbortController(token);
     const result = await mailService.sendEmail({
       to: input.to,
       subject: input.subject,
@@ -298,21 +306,25 @@ export class MailSendEmailTool extends Tool {
       cc: input.cc,
       bcc: input.bcc,
       attachments: input.attachments,
-    });
+    }, signal);
 
     const resultObj = result as Record<string, unknown>;
-    await saveSentMailRecord({
-      from: typeof resultObj.from === 'string' ? resultObj.from : undefined,
-      to: input.to,
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
-      cc: input.cc,
-      bcc: input.bcc,
-      attachments: input.attachments,
-      date: new Date().toISOString(),
-      messageId: typeof resultObj.messageId === 'string' ? resultObj.messageId : undefined,
-    });
+    try {
+      await saveSentMailRecord({
+        from: typeof resultObj.from === 'string' ? resultObj.from : undefined,
+        to: input.to,
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+        cc: input.cc,
+        bcc: input.bcc,
+        attachments: input.attachments,
+        date: new Date().toISOString(),
+        messageId: typeof resultObj.messageId === 'string' ? resultObj.messageId : undefined,
+      });
+    } catch (err) {
+      mcpMailOutputChannel.warn('[MailTools] Failed to save sent mail record (send succeeded):', err instanceof Error ? err.message : String(err));
+    }
 
     return JSON.stringify(result, null, 2);
   }
@@ -321,7 +333,7 @@ export class MailSendEmailTool extends Tool {
 export class MailReplyToEmailTool extends Tool {
   public readonly toolName = 'mail_reply_to_email';
 
-  async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
+  async call(options: vscode.LanguageModelToolInvocationOptions<object>, token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as {
       originalUid?: number;
       text?: string;
@@ -331,24 +343,30 @@ export class MailReplyToEmailTool extends Tool {
     }) || {};
     if (typeof input.originalUid !== 'number') throw new Error('originalUid must be a number');
     if (!input.text && !input.html) throw new Error('Either text or html content is required');
+
+    const { signal } = createAbortController(token);
     const result = await mailService.replyToEmail({
       originalUid: input.originalUid,
       text: input.text || '',
       html: input.html,
       replyToAll: input.replyToAll,
       includeOriginal: input.includeOriginal,
-    });
+    }, signal);
 
     const resultObj = result as Record<string, unknown>;
-    await saveSentMailRecord({
-      from: typeof resultObj.from === 'string' ? resultObj.from : undefined,
-      to: typeof resultObj.to === 'string' ? resultObj.to : (resultObj.replyTo as string) || '',
-      subject: typeof resultObj.subject === 'string' ? resultObj.subject : '',
-      text: input.text,
-      html: input.html,
-      date: new Date().toISOString(),
-      messageId: typeof resultObj.messageId === 'string' ? resultObj.messageId : undefined,
-    });
+    try {
+      await saveSentMailRecord({
+        from: typeof resultObj.from === 'string' ? resultObj.from : undefined,
+        to: typeof resultObj.to === 'string' ? resultObj.to : (resultObj.replyTo as string) || '',
+        subject: typeof resultObj.subject === 'string' ? resultObj.subject : '',
+        text: input.text,
+        html: input.html,
+        date: new Date().toISOString(),
+        messageId: typeof resultObj.messageId === 'string' ? resultObj.messageId : undefined,
+      });
+    } catch (err) {
+      mcpMailOutputChannel.warn('[MailTools] Failed to save sent mail record (reply succeeded):', err instanceof Error ? err.message : String(err));
+    }
 
     return JSON.stringify(result, null, 2);
   }

@@ -58,9 +58,13 @@ export class SMTPClient {
     }
   }
 
-  async sendMail(options: EmailOptions): Promise<EmailResult> {
+  async sendMail(options: EmailOptions, signal?: AbortSignal): Promise<EmailResult> {
     if (!this.transporter) {
       throw new Error('SMTP client not connected');
+    }
+
+    if (signal?.aborted) {
+      throw new Error('Send mail cancelled before starting');
     }
 
     const mailOptions = {
@@ -74,8 +78,25 @@ export class SMTPClient {
       attachments: options.attachments,
     };
 
+    const SEND_TIMEOUT_MS = 30000;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+
+    const timeoutOrCancelPromise = new Promise<never>((_, reject) => {
+      const onAbort = () => {
+        cancelled = true;
+        reject(new Error('Send mail was cancelled'));
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+      timer = setTimeout(() => {
+        reject(new Error(`Send mail timed out after ${SEND_TIMEOUT_MS}ms`));
+      }, SEND_TIMEOUT_MS);
+      if (timer) timer.unref?.();
+    });
+
     try {
-      const result = await this.transporter.sendMail(mailOptions);
+      const sendPromise = this.transporter.sendMail(mailOptions);
+      const result = await Promise.race([sendPromise, timeoutOrCancelPromise]);
 
       return {
         messageId: result.messageId,
@@ -84,7 +105,19 @@ export class SMTPClient {
         rejected: result.rejected || [],
       };
     } catch (error) {
-      throw new Error(`Failed to send email: ${error instanceof Error ? error.message : String(error)}`);
+      if (cancelled || signal?.aborted) {
+        try { this.transporter.close(); } catch {}
+        this.transporter = null;
+        throw new Error('Send mail was cancelled');
+      }
+      const errMsg = error instanceof Error ? error.message : String(error);
+      if (errMsg.includes('timed out')) {
+        try { this.transporter.close(); } catch {}
+        this.transporter = null;
+      }
+      throw new Error(`Failed to send email: ${errMsg}`);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
     }
   }
 
