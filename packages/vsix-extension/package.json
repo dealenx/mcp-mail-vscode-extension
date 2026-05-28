@@ -3,7 +3,7 @@
   "displayName": "MCP Mail for VS Code Copilot",
   "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
   "version": "0.7.1",
-  "publisher": "dealenx-dev",
+  "publisher": "dealenx",
   "engines": {
     "vscode": "^1.100.0"
   },
