@@ -107,7 +107,7 @@ mcp-mail-vscode-extension/          ← root (workspaces)
 - [x] **Task 4: Добавить настройку remote mode в vsix-extension**
   - Добавить в `package.json` → `contributes.configuration.properties`:
     - `mcpMail.sendMode`: enum `["local", "remote"]`, default `"local"`, description: "Режим отправки: локально (прямо через SMTP/IMAP) или удалённо (через сервис)"
-    - `mcpMail.remoteUrl`: string, default `"https://smtp-remote.mimikkai"`, description: "URL удалённого сервиса"
+    - `mcpMail.remoteUrl`: string, default `"https://smtp-remote.mimikkai.ru"`, description: "URL удалённого сервиса"
   - Создать `packages/vsix-extension/src/mail/config.ts` — обновить `getMailConfig()` чтобы включать `sendMode` и `remoteUrl`
 
   LOGGING: `[Config]` префикс, DEBUG при чтении настроек

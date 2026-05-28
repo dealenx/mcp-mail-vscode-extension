@@ -89,7 +89,7 @@ describe('Types', () => {
 
   test('SendMode should support local and remote', () => {
     const local: SendMode = { mode: 'local', remoteUrl: '' };
-    const remote: SendMode = { mode: 'remote', remoteUrl: 'https://smtp-remote.mimikkai' };
+    const remote: SendMode = { mode: 'remote', remoteUrl: 'https://smtp-remote.mimikkai.ru' };
     expect(local.mode).toBe('local');
     expect(remote.mode).toBe('remote');
   });

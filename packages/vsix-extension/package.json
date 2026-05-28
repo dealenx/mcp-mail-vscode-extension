@@ -2,7 +2,7 @@
   "name": "mcp-mail-vscode-extension",
   "displayName": "MCP Mail for VS Code Copilot",
   "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "publisher": "dealenx",
   "engines": {
     "vscode": "^1.100.0"
@@ -173,7 +173,7 @@
         },
         "mcpMail.remoteUrl": {
           "type": "string",
-          "default": "https://smtp-remote.mimikkai",
+          "default": "https://smtp-remote.mimikkai.ru",
           "description": "URL удалённого сервиса для отправки писем (используется только в режиме remote)",
           "order": 15
         }

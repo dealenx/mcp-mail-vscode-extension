@@ -1,0 +1,6 @@
+{
+  "$schema": "https://railpack.com/schema.json",
+  "build": {
+    "dockerfile": "Dockerfile"
+  }
+}
