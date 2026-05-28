@@ -2,7 +2,7 @@
   "name": "mcp-mail-vscode-extension",
   "displayName": "MCP Mail for VS Code Copilot",
   "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "publisher": "dealenx",
   "engines": {
     "vscode": "^1.100.0"
@@ -57,6 +57,10 @@
       {
         "command": "mcpMail.openAttachmentEditor",
         "title": "MCP Mail: Прикрепленные файлы"
+      },
+      {
+        "command": "mcpMail.toggleSendMode",
+        "title": "MCP Mail: Переключить режим отправки"
       }
     ],
     "viewsContainers": {

@@ -73,7 +73,7 @@ export function activate(context: vscode.ExtensionContext) {
       })
     );
 
-    registerSidebarCommands(context, sentMailHistory);
+    registerSidebarCommands(context, sentMailHistory, mailSidebarProvider);
 
     // Listen for sendMode changes to reset the mail service
     context.subscriptions.push(

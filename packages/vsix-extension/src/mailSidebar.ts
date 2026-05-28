@@ -28,12 +28,12 @@ export class MailSidebarProvider implements vscode.TreeDataProvider<MailSidebarI
       const remoteUrl = getRemoteUrl();
       const modeItem = new MailSidebarItem(
         sendMode === 'remote'
-          ? `🌐 Удалённый режим (${remoteUrl})`
+          ? `🌐 Удалённый режим`
           : `🖥️ Локальный режим`,
-        sendMode === 'remote' ? 'mcpMail.openSettings' : 'mcpMail.openSettings',
+        'mcpMail.toggleSendMode',
         sendMode === 'remote'
-          ? `Отправка через удалённый сервис: ${remoteUrl}\nНажмите, чтобы изменить настройки`
-          : `Отправка напрямую через IMAP/SMTP\nНажмите, чтобы изменить настройки`,
+          ? `Удалённый режим (${remoteUrl})\nНажмите, чтобы переключиться на локальный режим`
+          : `Локальный режим (IMAP/SMTP напрямую)\nНажмите, чтобы переключиться на удалённый режим`,
         vscode.TreeItemCollapsibleState.None,
         sendMode === 'remote' ? 'globe' : 'device-desktop'
       );
@@ -104,13 +104,29 @@ export class MailSidebarItem extends vscode.TreeItem {
   }
 }
 
-export function registerSidebarCommands(context: vscode.ExtensionContext, sentMailHistory?: SentMailHistoryService): void {
+export function registerSidebarCommands(context: vscode.ExtensionContext, sentMailHistory?: SentMailHistoryService, mailSidebarProvider?: MailSidebarProvider): void {
   mcpMailOutputChannel.info('[MCP Mail] Registering sidebar commands...');
 
   context.subscriptions.push(
     vscode.commands.registerCommand('mcpMail.openSettings', () => {
       mcpMailOutputChannel.info('[MCP Mail] openSettings command triggered');
       vscode.commands.executeCommand('workbench.action.openSettings', 'mcpMail');
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('mcpMail.toggleSendMode', async () => {
+      mcpMailOutputChannel.info('[MCP Mail] toggleSendMode command triggered');
+      const currentMode = getSendMode();
+      const newMode: 'local' | 'remote' = currentMode === 'local' ? 'remote' : 'local';
+      const cfg = vscode.workspace.getConfiguration('mcpMail');
+      await cfg.update('sendMode', newMode, vscode.ConfigurationTarget.Global);
+      const label = newMode === 'remote' ? '🌐 Удалённый режим' : '🖥️ Локальный режим';
+      vscode.window.showInformationMessage(`MCP Mail: переключено на ${label}`);
+      mcpMailOutputChannel.info('[MCP Mail] Send mode toggled to:', newMode);
+      if (mailSidebarProvider) {
+        mailSidebarProvider.refresh();
+      }
     })
   );
 
