@@ -75,6 +75,19 @@ export function activate(context: vscode.ExtensionContext) {
 
     registerSidebarCommands(context, sentMailHistory);
 
+    // Listen for sendMode changes to reset the mail service
+    context.subscriptions.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration('mcpMail.sendMode') || e.affectsConfiguration('mcpMail.remoteUrl')) {
+          mcpMailOutputChannel.info('[MCP Mail] Send mode or remote URL changed, resetting mail service');
+          const { getMailService } = require('./mailTools');
+          const service = getMailService(true);
+          service.disconnectAll();
+          mailSidebarProvider.refresh();
+        }
+      })
+    );
+
     // Set context key to make sidebar visible
     vscode.commands.executeCommand('setContext', 'mcpMail.extensionActive', true);
 

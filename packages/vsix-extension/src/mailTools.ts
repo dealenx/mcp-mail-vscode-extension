@@ -2,12 +2,40 @@ import * as vscode from 'vscode';
 import { Tool, createAbortController } from './tool';
 import { CancellationError } from './cancellation';
 import { MailService } from './mail/mailService';
+import { RemoteMailClient } from './mail/remote-client';
+import { IMailService } from './mail/imail-service';
+import { getSendMode } from './mail/config';
 import { SentMailHistoryService } from './sentMail/historyService';
 import { SentMailRecord } from './sentMail/types';
 import { mcpMailOutputChannel } from './logger';
 
-const mailService = new MailService();
+let mailServiceImpl: IMailService | null = null;
+let currentMode: 'local' | 'remote' | null = null;
 let sentMailHistory: SentMailHistoryService | null = null;
+
+export function getMailService(forceReset = false): IMailService {
+  const mode = getSendMode();
+  if (forceReset && mailServiceImpl) {
+    mailServiceImpl.disconnectAll();
+    mailServiceImpl = null;
+    currentMode = null;
+  }
+  if (mailServiceImpl && currentMode === mode) {
+    return mailServiceImpl;
+  }
+  if (mailServiceImpl) {
+    mailServiceImpl.disconnectAll();
+  }
+  if (mode === 'remote') {
+    mcpMailOutputChannel.info('[MailTools] Switching to remote mode');
+    mailServiceImpl = new RemoteMailClient();
+  } else {
+    mcpMailOutputChannel.info('[MailTools] Switching to local mode');
+    mailServiceImpl = new MailService();
+  }
+  currentMode = mode;
+  return mailServiceImpl;
+}
 
 export function setSentMailHistory(service: SentMailHistoryService): void {
   sentMailHistory = service;
@@ -56,7 +84,7 @@ export class MailConnectTool extends Tool {
     const results: string[] = [];
     try {
       if (signal.aborted) throw new CancellationError();
-      await mailService.ensureIMAPConnection();
+      await getMailService().ensureIMAPConnection();
       results.push('✅ IMAP: Connected successfully');
     } catch (e) {
       if (e instanceof CancellationError) throw e;
@@ -64,7 +92,7 @@ export class MailConnectTool extends Tool {
     }
     try {
       if (signal.aborted) throw new CancellationError();
-      await mailService.ensureSMTPConnection(signal);
+      await getMailService().ensureSMTPConnection(signal);
       results.push('✅ SMTP: Connected successfully');
     } catch (e) {
       if (e instanceof CancellationError) throw e;
@@ -78,7 +106,7 @@ export class MailDisconnectTool extends Tool {
   public readonly toolName = 'mail_disconnect_all';
 
   async call(_options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
-    mailService.disconnectAll();
+    getMailService().disconnectAll();
     return JSON.stringify({ success: true, message: 'Disconnected from all mail services' }, null, 2);
   }
 }
@@ -87,7 +115,7 @@ export class MailConnectionStatusTool extends Tool {
   public readonly toolName = 'mail_get_connection_status';
 
   async call(_options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
-    const status = await mailService.getConnectionStatus();
+    const status = await getMailService().getConnectionStatus();
     return JSON.stringify(status, null, 2);
   }
 }
@@ -98,7 +126,7 @@ export class MailListMailboxesTool extends Tool {
   public readonly toolName = 'mail_list_mailboxes';
 
   async call(_options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
-    const boxes = await mailService.listMailboxes();
+    const boxes = await getMailService().listMailboxes();
     return JSON.stringify(boxes, null, 2);
   }
 }
@@ -108,7 +136,7 @@ export class MailOpenMailboxTool extends Tool {
 
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = options.input as { mailboxName?: string; readOnly?: boolean } || {};
-    const info = await mailService.openMailbox(input.mailboxName || 'INBOX', input.readOnly || false);
+    const info = await getMailService().openMailbox(input.mailboxName || 'INBOX', input.readOnly || false);
     return JSON.stringify(info, null, 2);
   }
 }
@@ -119,7 +147,7 @@ export class MailGetMessageCountTool extends Tool {
   public readonly toolName = 'mail_get_message_count';
 
   async call(_options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
-    const count = await mailService.getMessageCount();
+    const count = await getMailService().getMessageCount();
     return JSON.stringify({ totalMessages: count }, null, 2);
   }
 }
@@ -129,7 +157,7 @@ export class MailGetUnseenMessagesTool extends Tool {
 
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as { limit?: number }) || {};
-    const messages = await mailService.getUnseenMessages(input.limit || 50);
+    const messages = await getMailService().getUnseenMessages(input.limit || 50);
     return JSON.stringify({ messages }, null, 2);
   }
 }
@@ -139,7 +167,7 @@ export class MailGetRecentMessagesTool extends Tool {
 
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as { limit?: number }) || {};
-    const messages = await mailService.getRecentMessages(input.limit || 50);
+    const messages = await getMailService().getRecentMessages(input.limit || 50);
     return JSON.stringify({ messages }, null, 2);
   }
 }
@@ -152,7 +180,7 @@ export class MailSearchBySenderTool extends Tool {
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as { sender?: string; startDate?: string; endDate?: string; inboxOnly?: boolean; limit?: number }) || {};
     if (!input.sender) throw new Error('sender parameter is required');
-    const result = await mailService.searchBySender(input.sender, input.startDate, input.endDate, input.inboxOnly || false, input.limit);
+    const result = await getMailService().searchBySender(input.sender, input.startDate, input.endDate, input.inboxOnly || false, input.limit);
     return JSON.stringify(result, null, 2);
   }
 }
@@ -163,7 +191,7 @@ export class MailSearchBySubjectTool extends Tool {
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as { subject?: string; startDate?: string; endDate?: string; inboxOnly?: boolean; limit?: number }) || {};
     if (!input.subject) throw new Error('subject parameter is required');
-    const result = await mailService.searchBySubject(input.subject, input.startDate, input.endDate, input.inboxOnly || false, input.limit);
+    const result = await getMailService().searchBySubject(input.subject, input.startDate, input.endDate, input.inboxOnly || false, input.limit);
     return JSON.stringify(result, null, 2);
   }
 }
@@ -174,7 +202,7 @@ export class MailSearchByBodyTool extends Tool {
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as { text?: string; startDate?: string; endDate?: string; inboxOnly?: boolean; limit?: number }) || {};
     if (!input.text) throw new Error('text parameter is required');
-    const result = await mailService.searchByBody(input.text, input.startDate, input.endDate, input.inboxOnly || false, input.limit);
+    const result = await getMailService().searchByBody(input.text, input.startDate, input.endDate, input.inboxOnly || false, input.limit);
     return JSON.stringify(result, null, 2);
   }
 }
@@ -185,7 +213,7 @@ export class MailSearchSinceDateTool extends Tool {
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as { date?: string; inboxOnly?: boolean; limit?: number }) || {};
     if (!input.date) throw new Error('date parameter is required');
-    const result = await mailService.searchSinceDate(input.date, input.inboxOnly || false, input.limit);
+    const result = await getMailService().searchSinceDate(input.date, input.inboxOnly || false, input.limit);
     return JSON.stringify(result, null, 2);
   }
 }
@@ -195,7 +223,7 @@ export class MailSearchAllMessagesTool extends Tool {
 
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as { startDate?: string; endDate?: string; inboxOnly?: boolean; limit?: number }) || {};
-    const result = await mailService.searchAllMessages(input.startDate, input.endDate, input.inboxOnly || false, input.limit || 50);
+    const result = await getMailService().searchAllMessages(input.startDate, input.endDate, input.inboxOnly || false, input.limit || 50);
     return JSON.stringify(result, null, 2);
   }
 }
@@ -208,7 +236,7 @@ export class MailGetMessagesTool extends Tool {
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as { uids?: number[]; markSeen?: boolean }) || {};
     if (!Array.isArray(input.uids)) throw new Error('uids must be an array of numbers');
-    const messages = await mailService.getMessages(input.uids, input.markSeen || false);
+    const messages = await getMailService().getMessages(input.uids, input.markSeen || false);
     return JSON.stringify({ messages }, null, 2);
   }
 }
@@ -219,7 +247,7 @@ export class MailGetMessageTool extends Tool {
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as { uid?: number; markSeen?: boolean }) || {};
     if (typeof input.uid !== 'number') throw new Error('uid must be a number');
-    const message = await mailService.getMessage(input.uid, input.markSeen || false);
+    const message = await getMailService().getMessage(input.uid, input.markSeen || false);
     if (!message) throw new Error(`Message with UID ${input.uid} not found`);
     return JSON.stringify(message, null, 2);
   }
@@ -233,7 +261,7 @@ export class MailDeleteMessageTool extends Tool {
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as { uid?: number }) || {};
     if (typeof input.uid !== 'number') throw new Error('uid must be a number');
-    await mailService.deleteMessage(input.uid);
+    await getMailService().deleteMessage(input.uid);
     return JSON.stringify({ success: true, deletedUid: input.uid }, null, 2);
   }
 }
@@ -246,7 +274,7 @@ export class MailGetAttachmentsTool extends Tool {
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as { uid?: number }) || {};
     if (typeof input.uid !== 'number') throw new Error('uid must be a number');
-    const attachments = await mailService.getAttachmentsMeta(input.uid);
+    const attachments = await getMailService().getAttachmentsMeta(input.uid);
     return JSON.stringify({ uid: input.uid, attachmentCount: attachments?.length || 0, attachments: attachments || [] }, null, 2);
   }
 }
@@ -257,7 +285,7 @@ export class MailSaveAttachmentTool extends Tool {
   async call(options: vscode.LanguageModelToolInvocationOptions<object>, _token: vscode.CancellationToken): Promise<string> {
     const input = (options.input as { uid?: number; attachmentIndex?: number; returnBase64?: boolean }) || {};
     if (typeof input.uid !== 'number') throw new Error('uid must be a number');
-    const attachments = await mailService.saveAttachment(input.uid, input.attachmentIndex);
+    const attachments = await getMailService().saveAttachment(input.uid, input.attachmentIndex);
     if (attachments.length === 0) {
       return JSON.stringify({ uid: input.uid, note: 'This email has no attachments.' }, null, 2);
     }
@@ -298,7 +326,7 @@ export class MailSendEmailTool extends Tool {
     if (!input.text && !input.html) throw new Error('Either text or html content is required');
 
     const { signal } = createAbortController(token);
-    const result = await mailService.sendEmail({
+    const result = await getMailService().sendEmail({
       to: input.to,
       subject: input.subject,
       text: input.text,
@@ -345,7 +373,7 @@ export class MailReplyToEmailTool extends Tool {
     if (!input.text && !input.html) throw new Error('Either text or html content is required');
 
     const { signal } = createAbortController(token);
-    const result = await mailService.replyToEmail({
+    const result = await getMailService().replyToEmail({
       originalUid: input.originalUid,
       text: input.text || '',
       html: input.html,

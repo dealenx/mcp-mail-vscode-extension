@@ -1,0 +1,23 @@
+{
+  "name": "@mcp-mail/core",
+  "version": "0.1.0",
+  "description": "Shared mail types and clients for MCP Mail",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "imap": "^0.8.19",
+    "mailparser": "^3.7.4",
+    "nodemailer": "^6.9.0"
+  },
+  "devDependencies": {
+    "@types/imap": "^0.8.42",
+    "@types/mailparser": "^3.4.6",
+    "@types/nodemailer": "^6.4.0",
+    "typescript": "^5.8.2"
+  }
+}

@@ -9,4 +9,5 @@ src/**
 .ai-factory/**
 tsconfig.json
 .eslintrc*
-eslint.config.*</think>
+eslint.config.*
+scripts/**</think>
