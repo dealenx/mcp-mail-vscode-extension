@@ -2,7 +2,7 @@
   "name": "mcp-mail-vscode-extension",
   "displayName": "MCP Mail for VS Code Copilot",
   "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
-  "version": "0.7.3",
+  "version": "0.7.6",
   "publisher": "dealenx",
   "engines": {
     "vscode": "^1.100.0"
@@ -61,6 +61,14 @@
       {
         "command": "mcpMail.toggleSendMode",
         "title": "MCP Mail: Переключить режим отправки"
+      },
+      {
+        "command": "mcpMail.setLocalMode",
+        "title": "MCP Mail: Локальный режим"
+      },
+      {
+        "command": "mcpMail.setRemoteMode",
+        "title": "MCP Mail: Удалённый режим"
       }
     ],
     "viewsContainers": {
@@ -74,6 +82,11 @@
     },
     "views": {
       "mcpMailPanel": [
+        {
+          "id": "mcpMailSendModeView",
+          "name": "Режим отправки",
+          "icon": "$(globe)"
+        },
         {
           "id": "mcpMailTreeView",
           "name": "MCP Mail",
@@ -177,7 +190,7 @@
         },
         "mcpMail.remoteUrl": {
           "type": "string",
-          "default": "https://smtp-remote.mimikkai.ru",
+          "default": "https://smtp-service.mimikkai.ru",
           "description": "URL удалённого сервиса для отправки писем (используется только в режиме remote)",
           "order": 15
         }

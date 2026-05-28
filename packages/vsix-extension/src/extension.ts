@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { mcpMailOutputChannel } from './logger';
 import { MailSidebarProvider, registerSidebarCommands } from './mailSidebar';
+import { SendModeProvider } from './sendModePanel';
 import { SentMailHistoryService } from './sentMail/historyService';
 import { SentMailTreeDataProvider } from './sentMail/sentMailTreeView';
 import { getSentMailStoragePath, ensureStorageDir } from './sentMail/storage';
@@ -26,6 +27,16 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(treeView);
     mcpMailOutputChannel.info('[MCP Mail] TreeView registered successfully');
+
+    // Send mode panel
+    mcpMailOutputChannel.info('[MCP Mail] Creating SendMode TreeView...');
+    const sendModeProvider = new SendModeProvider();
+    const sendModeTreeView = vscode.window.createTreeView('mcpMailSendModeView', {
+      treeDataProvider: sendModeProvider,
+      showCollapseAll: false,
+    });
+    context.subscriptions.push(sendModeTreeView);
+    mcpMailOutputChannel.info('[MCP Mail] SendMode TreeView registered');
 
     // Sent Mail history + TreeView
     mcpMailOutputChannel.info('[MCP Mail] Initializing Sent Mail storage...');
@@ -84,6 +95,7 @@ export function activate(context: vscode.ExtensionContext) {
           const service = getMailService(true);
           service.disconnectAll();
           mailSidebarProvider.refresh();
+          sendModeProvider.refresh();
         }
       })
     );
@@ -96,6 +108,7 @@ export function activate(context: vscode.ExtensionContext) {
       mcpMailOutputChannel.info('[MCP Mail] Triggering initial refresh');
       mailSidebarProvider.refresh();
       sentMailProvider.refresh();
+      sendModeProvider.refresh();
     }, 500);
 
     // Register tools separately - sidebar should work even if tools fail

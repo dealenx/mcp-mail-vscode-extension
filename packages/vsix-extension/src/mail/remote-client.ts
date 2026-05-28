@@ -12,14 +12,23 @@ export class RemoteMailClient {
     mcpMailOutputChannel.info(`[RemoteClient] 🌐 Remote mode active — proxy: ${this.baseUrl}`);
   }
 
-  private async request(path: string, body: any, method: string = 'POST'): Promise<any> {
+  private async request(path: string, body: any, method: string = 'POST', signal?: AbortSignal): Promise<any> {
     const url = `${this.baseUrl}/api/${path}`;
     mcpMailOutputChannel.debug(`[RemoteClient] ${method} ${url}`);
+
+    const timeoutMs = 120_000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    if (signal) {
+      signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
 
     try {
       const options: RequestInit = {
         method,
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
       };
       if (method !== 'GET') {
         options.body = JSON.stringify(body);
@@ -27,12 +36,18 @@ export class RemoteMailClient {
         const params = new URLSearchParams({ sessionId: body.sessionId });
         const urlWithParams = `${url}?${params.toString()}`;
         const response = await fetch(urlWithParams, options);
+        clearTimeout(timeoutId);
         return this.handleResponse(response, url);
       }
 
       const response = await fetch(url, options);
+      clearTimeout(timeoutId);
       return this.handleResponse(response, url);
     } catch (error) {
+      clearTimeout(timeoutId);
+      if (controller.signal.aborted && signal?.aborted) {
+        throw new Error(`Remote service request cancelled: ${method} ${url}`);
+      }
       const errMsg = error instanceof Error ? error.message : String(error);
       mcpMailOutputChannel.error(`[RemoteClient] Request failed: ${method} ${url} - ${errMsg}`);
       throw new Error(`Remote service request failed: ${errMsg}`);
@@ -228,7 +243,7 @@ export class RemoteMailClient {
     cc?: string;
     bcc?: string;
     attachments?: string[];
-  }, _signal?: AbortSignal): Promise<object> {
+  }, signal?: AbortSignal): Promise<object> {
     await this.autoReconnect();
 
     let remoteAttachments: Array<{ filename: string; content: string; contentType?: string }> | undefined;
@@ -237,11 +252,20 @@ export class RemoteMailClient {
       const path = await import('path');
       remoteAttachments = [];
       for (const filePath of args.attachments) {
-        const content = await fs.readFile(filePath);
-        remoteAttachments.push({
-          filename: path.basename(filePath),
-          content: content.toString('base64'),
-        });
+        mcpMailOutputChannel.info(`[RemoteClient] [FIX] Reading attachment: ${filePath}`);
+        try {
+          const content = await fs.readFile(filePath);
+          const base64Size = content.toString('base64').length;
+          mcpMailOutputChannel.info(`[RemoteClient] [FIX] Attachment read: ${path.basename(filePath)} (${content.length} bytes, base64: ${base64Size} chars)`);
+          remoteAttachments.push({
+            filename: path.basename(filePath),
+            content: content.toString('base64'),
+          });
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          mcpMailOutputChannel.error(`[RemoteClient] [FIX] Failed to read attachment ${filePath}: ${errMsg}`);
+          throw new Error(`Failed to read attachment ${filePath}: ${errMsg}`);
+        }
       }
     }
 
@@ -254,7 +278,7 @@ export class RemoteMailClient {
       cc: args.cc,
       bcc: args.bcc,
       attachments: remoteAttachments,
-    });
+    }, undefined, signal);
   }
 
   async replyToEmail(args: {
@@ -263,7 +287,7 @@ export class RemoteMailClient {
     html?: string;
     replyToAll?: boolean;
     includeOriginal?: boolean;
-  }, _signal?: AbortSignal): Promise<object> {
+  }, signal?: AbortSignal): Promise<object> {
     await this.autoReconnect();
     return this.request('reply-email', {
       sessionId: this.sessionId,
@@ -272,6 +296,6 @@ export class RemoteMailClient {
       html: args.html,
       replyToAll: args.replyToAll,
       includeOriginal: args.includeOriginal,
-    });
+    }, undefined, signal);
   }
 }

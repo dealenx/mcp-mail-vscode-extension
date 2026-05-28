@@ -33,7 +33,7 @@ export function getMailConfig(): MailConfig {
   const smtpSecure = cfg.get<boolean>('smtpSecure');
 
   const sendMode = cfg.get<'local' | 'remote'>('sendMode', 'local');
-  const remoteUrl = cfg.get<string>('remoteUrl', 'https://smtp-remote.mimikkai.ru');
+  const remoteUrl = cfg.get<string>('remoteUrl', 'https://smtp-service.mimikkai.ru');
 
   if (!host || !port || !user || !pass || tls === undefined) {
     throw new Error(
@@ -62,7 +62,7 @@ export function getMailConfig(): MailConfig {
       secure: smtpSecure,
     },
     sendMode,
-    remoteUrl: remoteUrl || 'https://smtp-remote.mimikkai.ru',
+    remoteUrl: remoteUrl || 'https://smtp-service.mimikkai.ru',
   };
 }
 
@@ -73,5 +73,5 @@ export function getSendMode(): 'local' | 'remote' {
 
 export function getRemoteUrl(): string {
   const cfg = vscode.workspace.getConfiguration('mcpMail');
-  return cfg.get<string>('remoteUrl', 'https://smtp-remote.mimikkai.ru') || 'https://smtp-remote.mimikkai.ru';
+  return cfg.get<string>('remoteUrl', 'https://smtp-service.mimikkai.ru') || 'https://smtp-service.mimikkai.ru';
 }
