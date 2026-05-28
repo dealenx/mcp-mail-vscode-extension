@@ -12,6 +12,11 @@ const replyEmailSchema = z.object({
   html: z.string().optional(),
   replyToAll: z.boolean().optional().default(false),
   includeOriginal: z.boolean().optional().default(true),
+  attachments: z.array(z.object({
+    filename: z.string(),
+    content: z.string(),
+    contentType: z.string().optional(),
+  })).optional(),
 });
 
 replyEmailRouter.post('/', async (c) => {
@@ -23,7 +28,7 @@ replyEmailRouter.post('/', async (c) => {
       return c.json({ error: 'Invalid request', details: parsed.error.errors }, 400);
     }
 
-    const { sessionId, originalUid, text, html, replyToAll, includeOriginal } = parsed.data;
+    const { sessionId, originalUid, text, html, replyToAll, includeOriginal, attachments } = parsed.data;
 
     if (!text && !html) {
       return c.json({ error: 'Either text or html content is required' }, 400);
@@ -86,6 +91,14 @@ replyEmailRouter.post('/', async (c) => {
       text: finalText,
       html: finalHtml,
     };
+
+    if (attachments && attachments.length > 0) {
+      emailOptions.attachments = attachments.map((att) => ({
+        filename: att.filename,
+        content: Buffer.from(att.content, 'base64'),
+        contentType: att.contentType,
+      }));
+    }
 
     const result = await smtp.sendMail(emailOptions);
     console.error('[ReplyEmail] Reply sent successfully:', result.messageId);

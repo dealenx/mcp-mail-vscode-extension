@@ -1,5 +1,7 @@
 import { mcpMailOutputChannel } from '../logger';
 import { getMailConfig, getSendMode, getRemoteUrl } from './config';
+import { getDefaultAttachmentsConfig } from '../sentMail/attachments';
+import { getSignatureConfig, stripHtml } from '../sentMail/signature';
 
 export class RemoteMailClient {
   private sessionId: string | null = null;
@@ -246,17 +248,33 @@ export class RemoteMailClient {
   }, signal?: AbortSignal): Promise<object> {
     await this.autoReconnect();
 
-    let remoteAttachments: Array<{ filename: string; content: string; contentType?: string }> | undefined;
+    let htmlContent = args.html;
+    let textContent = args.text;
+
+    const sig = getSignatureConfig();
+    if (sig.enabled && sig.html) {
+      if (htmlContent) {
+        htmlContent += `<br><br><hr><div style="white-space: pre-wrap; word-break: break-word;">${sig.html}</div>`;
+        mcpMailOutputChannel.info('[RemoteClient] [FIX] HTML signature appended');
+      }
+      if (textContent) {
+        textContent += `\n\n---\n${stripHtml(sig.html)}`;
+        mcpMailOutputChannel.info('[RemoteClient] [FIX] Text signature appended');
+      }
+    }
+
+    const remoteAttachments: Array<{ filename: string; content: string; contentType?: string }> = [];
+    const existingPaths = new Set<string>();
+    const fs = await import('fs/promises');
+    const path = await import('path');
+
     if (args.attachments && args.attachments.length > 0) {
-      const fs = await import('fs/promises');
-      const path = await import('path');
-      remoteAttachments = [];
       for (const filePath of args.attachments) {
+        existingPaths.add(filePath);
         mcpMailOutputChannel.info(`[RemoteClient] [FIX] Reading attachment: ${filePath}`);
         try {
           const content = await fs.readFile(filePath);
-          const base64Size = content.toString('base64').length;
-          mcpMailOutputChannel.info(`[RemoteClient] [FIX] Attachment read: ${path.basename(filePath)} (${content.length} bytes, base64: ${base64Size} chars)`);
+          mcpMailOutputChannel.info(`[RemoteClient] [FIX] Attachment read: ${path.basename(filePath)} (${content.length} bytes)`);
           remoteAttachments.push({
             filename: path.basename(filePath),
             content: content.toString('base64'),
@@ -269,15 +287,36 @@ export class RemoteMailClient {
       }
     }
 
+    const defaultAtt = getDefaultAttachmentsConfig();
+    if (defaultAtt.enabled && defaultAtt.files.length > 0) {
+      for (const filePath of defaultAtt.files) {
+        if (existingPaths.has(filePath)) {
+          mcpMailOutputChannel.debug(`[RemoteClient] [FIX] Skipping duplicate default attachment: ${filePath}`);
+          continue;
+        }
+        try {
+          const content = await fs.readFile(filePath);
+          remoteAttachments.push({
+            filename: path.basename(filePath),
+            content: content.toString('base64'),
+          });
+          mcpMailOutputChannel.info(`[RemoteClient] [FIX] Default attachment added: ${path.basename(filePath)} (${content.length} bytes)`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          mcpMailOutputChannel.warn(`[RemoteClient] [FIX] Failed to read default attachment ${filePath}: ${msg}`);
+        }
+      }
+    }
+
     return this.request('send-email', {
       sessionId: this.sessionId,
       to: args.to,
       subject: args.subject,
-      text: args.text,
-      html: args.html,
+      text: textContent,
+      html: htmlContent,
       cc: args.cc,
       bcc: args.bcc,
-      attachments: remoteAttachments,
+      attachments: remoteAttachments.length > 0 ? remoteAttachments : undefined,
     }, undefined, signal);
   }
 
@@ -289,13 +328,51 @@ export class RemoteMailClient {
     includeOriginal?: boolean;
   }, signal?: AbortSignal): Promise<object> {
     await this.autoReconnect();
+
+    let htmlContent = args.html;
+    let textContent = args.text;
+
+    const sig = getSignatureConfig();
+    if (sig.enabled && sig.html) {
+      if (htmlContent) {
+        htmlContent += `<br><br><hr><div style="white-space: pre-wrap; word-break: break-word;">${sig.html}</div>`;
+        mcpMailOutputChannel.info('[RemoteClient] [FIX] HTML signature appended to reply');
+      }
+      if (textContent) {
+        textContent += `\n\n---\n${stripHtml(sig.html)}`;
+        mcpMailOutputChannel.info('[RemoteClient] [FIX] Text signature appended to reply');
+      }
+    }
+
+    const remoteAttachments: Array<{ filename: string; content: string; contentType?: string }> = [];
+
+    const defaultAtt = getDefaultAttachmentsConfig();
+    if (defaultAtt.enabled && defaultAtt.files.length > 0) {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      for (const filePath of defaultAtt.files) {
+        try {
+          const content = await fs.readFile(filePath);
+          remoteAttachments.push({
+            filename: path.basename(filePath),
+            content: content.toString('base64'),
+          });
+          mcpMailOutputChannel.info(`[RemoteClient] [FIX] Default attachment added to reply: ${path.basename(filePath)} (${content.length} bytes)`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          mcpMailOutputChannel.warn(`[RemoteClient] [FIX] Failed to read default attachment ${filePath}: ${msg}`);
+        }
+      }
+    }
+
     return this.request('reply-email', {
       sessionId: this.sessionId,
       originalUid: args.originalUid,
-      text: args.text,
-      html: args.html,
+      text: textContent,
+      html: htmlContent,
       replyToAll: args.replyToAll,
       includeOriginal: args.includeOriginal,
+      attachments: remoteAttachments.length > 0 ? remoteAttachments : undefined,
     }, undefined, signal);
   }
 }
