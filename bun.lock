@@ -24,18 +24,23 @@
       "name": "@mcp-mail/service",
       "version": "0.1.0",
       "dependencies": {
-        "@mcp-mail/core": "workspace:*",
         "hono": "^4.7.0",
+        "imap": "^0.8.19",
+        "mailparser": "^3.7.4",
+        "nodemailer": "^6.9.0",
         "zod": "^3.24.0",
       },
       "devDependencies": {
         "@types/bun": "^1.3.14",
+        "@types/imap": "^0.8.42",
+        "@types/mailparser": "^3.4.6",
+        "@types/nodemailer": "^6.4.0",
         "typescript": "^5.8.2",
       },
     },
     "packages/vsix-extension": {
       "name": "mcp-mail-vscode-extension",
-      "version": "0.7.1",
+      "version": "0.7.2",
       "dependencies": {
         "imap": "^0.8.19",
         "mailparser": "^3.7.4",

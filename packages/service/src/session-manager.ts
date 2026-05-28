@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
-import { IMAPClient, SMTPClient } from '@mcp-mail/core';
-import type { IMAPConfig, SMTPConfig } from '@mcp-mail/core';
+import { IMAPClient, SMTPClient } from './core';
+import type { IMAPConfig, SMTPConfig } from './core';
 
 interface SessionConnections {
   imap: IMAPClient | null;

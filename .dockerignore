@@ -2,6 +2,7 @@
 .opencode
 .ai-factory
 node_modules
+packages/core
 packages/vsix-extension
 tests
 *.vsix
