@@ -1,0 +1,16 @@
+{
+  "name": "mcp-mail-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "bun run --filter '*' build",
+    "test": "bun run --filter '*' test",
+    "test:core": "bun test --cwd packages/core",
+    "test:service": "bun test --cwd packages/service",
+    "dev:service": "bun run --cwd packages/service dev",
+    "lint": "bun run --filter '*' lint"
+  }
+}

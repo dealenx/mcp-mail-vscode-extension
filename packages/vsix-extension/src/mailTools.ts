@@ -28,7 +28,9 @@ export function getMailService(forceReset = false): IMailService {
   }
   if (mode === 'remote') {
     mcpMailOutputChannel.info('[MailTools] Switching to remote mode');
-    mailServiceImpl = new RemoteMailClient();
+    const remoteClient = new RemoteMailClient();
+    remoteClient.startKeepalive();
+    mailServiceImpl = remoteClient;
   } else {
     mcpMailOutputChannel.info('[MailTools] Switching to local mode');
     mailServiceImpl = new MailService();

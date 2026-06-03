@@ -8,6 +8,7 @@ export class RemoteMailClient {
   private baseUrl: string;
   private imapConnected = false;
   private smtpConnected = false;
+  private keepaliveInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(baseUrl?: string) {
     this.baseUrl = baseUrl || getRemoteUrl();
@@ -84,6 +85,22 @@ export class RemoteMailClient {
     return data;
   }
 
+  private async requestWithRetry(path: string, body: any, method: string = 'POST', signal?: AbortSignal): Promise<any> {
+    try {
+      return await this.request(path, body, method, signal);
+    } catch (error) {
+      const isSessionError = error instanceof Error &&
+        (error.message.includes('Session not found') || error.message.includes('sessionId'));
+      if (isSessionError) {
+        mcpMailOutputChannel.info('[RemoteClient] [FIX] Session expired, reconnecting and retrying...');
+        await this.connect();
+        const newBody = { ...body, sessionId: this.sessionId };
+        return this.request(path, newBody, method, signal);
+      }
+      throw error;
+    }
+  }
+
   async ensureIMAPConnection(): Promise<void> {
     if (this.imapConnected && this.sessionId) return;
     await this.connect();
@@ -134,10 +151,48 @@ export class RemoteMailClient {
     if (!this.sessionId) {
       mcpMailOutputChannel.info('[RemoteClient] No active session, reconnecting...');
       await this.connect();
+      return;
+    }
+    try {
+      await this.request('status', { sessionId: this.sessionId }, 'GET');
+      mcpMailOutputChannel.debug('[RemoteClient] Session still alive');
+    } catch {
+      mcpMailOutputChannel.info('[RemoteClient] [FIX] Session invalid, reconnecting...');
+      this.sessionId = null;
+      this.imapConnected = false;
+      this.smtpConnected = false;
+      await this.connect();
+    }
+  }
+
+  startKeepalive(): void {
+    if (this.keepaliveInterval) return;
+    this.keepaliveInterval = setInterval(async () => {
+      if (this.sessionId) {
+        try {
+          await this.request('status', { sessionId: this.sessionId }, 'GET');
+          mcpMailOutputChannel.debug('[RemoteClient] Keepalive: session alive');
+        } catch {
+          mcpMailOutputChannel.info('[RemoteClient] Keepalive: session expired, clearing state');
+          this.sessionId = null;
+          this.imapConnected = false;
+          this.smtpConnected = false;
+        }
+      }
+    }, 5 * 60 * 1000);
+    mcpMailOutputChannel.info('[RemoteClient] Keepalive started (5 min interval)');
+  }
+
+  stopKeepalive(): void {
+    if (this.keepaliveInterval) {
+      clearInterval(this.keepaliveInterval);
+      this.keepaliveInterval = null;
+      mcpMailOutputChannel.info('[RemoteClient] Keepalive stopped');
     }
   }
 
   disconnectAll(): void {
+    this.stopKeepalive();
     if (this.sessionId) {
       this.request('disconnect', { sessionId: this.sessionId }).catch((err) => {
         mcpMailOutputChannel.warn('[RemoteClient] Disconnect error:', err instanceof Error ? err.message : String(err));
@@ -151,89 +206,89 @@ export class RemoteMailClient {
 
   async getConnectionStatus(): Promise<object> {
     await this.autoReconnect();
-    const data = await this.request('status', { sessionId: this.sessionId });
+    const data = await this.requestWithRetry('status', { sessionId: this.sessionId });
     return data;
   }
 
   async listMailboxes(): Promise<any> {
     await this.autoReconnect();
-    return this.request('mailboxes', { sessionId: this.sessionId });
+    return this.requestWithRetry('mailboxes', { sessionId: this.sessionId });
   }
 
   async openMailbox(mailboxName = 'INBOX', readOnly = false): Promise<any> {
     await this.autoReconnect();
-    return this.request('messages/open-mailbox', { sessionId: this.sessionId, mailboxName, readOnly });
+    return this.requestWithRetry('messages/open-mailbox', { sessionId: this.sessionId, mailboxName, readOnly });
   }
 
   async getMessageCount(): Promise<number> {
     await this.autoReconnect();
-    const data = await this.request('messages/count', { sessionId: this.sessionId });
+    const data = await this.requestWithRetry('messages/count', { sessionId: this.sessionId });
     return data.totalMessages;
   }
 
   async getUnseenMessages(limit = 50): Promise<any[]> {
     await this.autoReconnect();
-    const data = await this.request('messages/unseen', { sessionId: this.sessionId, limit });
+    const data = await this.requestWithRetry('messages/unseen', { sessionId: this.sessionId, limit });
     return data.messages;
   }
 
   async getRecentMessages(limit = 50): Promise<any[]> {
     await this.autoReconnect();
-    const data = await this.request('messages/recent', { sessionId: this.sessionId, limit });
+    const data = await this.requestWithRetry('messages/recent', { sessionId: this.sessionId, limit });
     return data.messages;
   }
 
   async searchBySender(sender: string, startDate?: string, endDate?: string, inboxOnly?: boolean, limit?: number): Promise<any> {
     await this.autoReconnect();
-    return this.request('search/sender', { sessionId: this.sessionId, sender, startDate, endDate, inboxOnly, limit });
+    return this.requestWithRetry('search/sender', { sessionId: this.sessionId, sender, startDate, endDate, inboxOnly, limit });
   }
 
   async searchBySubject(subject: string, startDate?: string, endDate?: string, inboxOnly?: boolean, limit?: number): Promise<any> {
     await this.autoReconnect();
-    return this.request('search/subject', { sessionId: this.sessionId, subject, startDate, endDate, inboxOnly, limit });
+    return this.requestWithRetry('search/subject', { sessionId: this.sessionId, subject, startDate, endDate, inboxOnly, limit });
   }
 
   async searchByBody(text: string, startDate?: string, endDate?: string, inboxOnly?: boolean, limit?: number): Promise<any> {
     await this.autoReconnect();
-    return this.request('search/body', { sessionId: this.sessionId, text, startDate, endDate, inboxOnly, limit });
+    return this.requestWithRetry('search/body', { sessionId: this.sessionId, text, startDate, endDate, inboxOnly, limit });
   }
 
   async searchSinceDate(date: string, inboxOnly?: boolean, limit?: number): Promise<any> {
     await this.autoReconnect();
-    return this.request('search/since', { sessionId: this.sessionId, date, inboxOnly, limit });
+    return this.requestWithRetry('search/since', { sessionId: this.sessionId, date, inboxOnly, limit });
   }
 
   async searchAllMessages(startDate?: string, endDate?: string, inboxOnly?: boolean, limit?: number): Promise<any> {
     await this.autoReconnect();
-    return this.request('search/all', { sessionId: this.sessionId, startDate, endDate, inboxOnly, limit: limit || 50 });
+    return this.requestWithRetry('search/all', { sessionId: this.sessionId, startDate, endDate, inboxOnly, limit: limit || 50 });
   }
 
   async getMessages(uids: number[], markSeen = false): Promise<any[]> {
     await this.autoReconnect();
-    const data = await this.request('messages/list', { sessionId: this.sessionId, uids, markSeen });
+    const data = await this.requestWithRetry('messages/list', { sessionId: this.sessionId, uids, markSeen });
     return data.messages;
   }
 
   async getMessage(uid: number, markSeen = false): Promise<any | null> {
     await this.autoReconnect();
-    const data = await this.request('messages/get', { sessionId: this.sessionId, uid, markSeen });
+    const data = await this.requestWithRetry('messages/get', { sessionId: this.sessionId, uid, markSeen });
     return data.message;
   }
 
   async deleteMessage(uid: number): Promise<void> {
     await this.autoReconnect();
-    await this.request('messages/delete', { sessionId: this.sessionId, uid });
+    await this.requestWithRetry('messages/delete', { sessionId: this.sessionId, uid });
   }
 
   async getAttachmentsMeta(uid: number): Promise<any[] | undefined> {
     await this.autoReconnect();
-    const data = await this.request('attachments/meta', { sessionId: this.sessionId, uid });
+    const data = await this.requestWithRetry('attachments/meta', { sessionId: this.sessionId, uid });
     return data.attachments;
   }
 
   async saveAttachment(uid: number, attachmentIndex?: number): Promise<Array<{ filename: string; content: string; size: number }>> {
     await this.autoReconnect();
-    const data = await this.request('attachments/save', { sessionId: this.sessionId, uid, attachmentIndex });
+    const data = await this.requestWithRetry('attachments/save', { sessionId: this.sessionId, uid, attachmentIndex });
     return data.files || [];
   }
 
@@ -308,7 +363,7 @@ export class RemoteMailClient {
       }
     }
 
-    return this.request('send-email', {
+    return this.requestWithRetry('send-email', {
       sessionId: this.sessionId,
       to: args.to,
       subject: args.subject,
@@ -365,7 +420,7 @@ export class RemoteMailClient {
       }
     }
 
-    return this.request('reply-email', {
+    return this.requestWithRetry('reply-email', {
       sessionId: this.sessionId,
       originalUid: args.originalUid,
       text: textContent,

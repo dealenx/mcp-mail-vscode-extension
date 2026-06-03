@@ -161,4 +161,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {
   mcpMailOutputChannel.info('[MCP Mail] Extension deactivating');
+  const { getMailService } = require('./mailTools');
+  const service = getMailService();
+  service.disconnectAll();
 }

@@ -10,7 +10,7 @@ interface SessionConnections {
   smtpConfig: SMTPConfig;
 }
 
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+const SESSION_TIMEOUT_MS = parseInt(process.env.SESSION_TIMEOUT_MS || String(30 * 60 * 1000), 10);
 const sessions = new Map<string, SessionConnections>();
 
 let cleanupInterval: ReturnType<typeof setInterval> | null = null;
