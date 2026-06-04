@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { validateSession, getIMAPClient, getSMTPClient } from '../session-manager';
 import { findSentMailbox, buildRawEmailMessage } from './send-email';
+import { checkOrMarkIdempotency, storeIdempotencyResult, storeIdempotencyError, IdempotencyResult } from '../middleware/idempotency';
 
 export const replyEmailRouter = new Hono();
 
@@ -12,6 +13,7 @@ const replyEmailSchema = z.object({
   html: z.string().optional(),
   replyToAll: z.boolean().optional().default(false),
   includeOriginal: z.boolean().optional().default(true),
+  idempotencyKey: z.string().optional(),
   attachments: z.array(z.object({
     filename: z.string(),
     content: z.string(),
@@ -21,6 +23,7 @@ const replyEmailSchema = z.object({
 
 replyEmailRouter.post('/', async (c) => {
   console.error('[ReplyEmail] Incoming reply email request');
+  let idempotencyKey: string | undefined;
   try {
     const body = await c.req.json();
     const parsed = replyEmailSchema.safeParse(body);
@@ -29,9 +32,21 @@ replyEmailRouter.post('/', async (c) => {
     }
 
     const { sessionId, originalUid, text, html, replyToAll, includeOriginal, attachments } = parsed.data;
+    idempotencyKey = parsed.data.idempotencyKey;
 
     if (!text && !html) {
       return c.json({ error: 'Either text or html content is required' }, 400);
+    }
+
+    const idemResult = checkOrMarkIdempotency(idempotencyKey);
+    if (idemResult.type === IdempotencyResult.DUPLICATE && idemResult.response) {
+      console.error(`[ReplyEmail] Idempotency duplicate: ${idempotencyKey}`);
+      return c.json(idemResult.response.body, idemResult.response.status as 200);
+    }
+    if (idemResult.type === IdempotencyResult.PENDING && idemResult.pendingPromise) {
+      console.error(`[ReplyEmail] Idempotency pending: ${idempotencyKey} — waiting for in-flight request`);
+      const pendingResult = await idemResult.pendingPromise;
+      return c.json(pendingResult.body, pendingResult.httpStatus as 200);
     }
 
     const imap = await getIMAPClient(sessionId);
@@ -115,7 +130,7 @@ replyEmailRouter.post('/', async (c) => {
       console.error('[ReplyEmail] Failed to save to sent folder:', err instanceof Error ? err.message : String(err));
     }
 
-    return c.json({
+    const response = {
       ...result,
       replyTo: originalFrom,
       replyToAll,
@@ -123,9 +138,14 @@ replyEmailRouter.post('/', async (c) => {
       subject: replySubject,
       to: originalFrom,
       from: session.smtpConfig.username,
-    });
+    };
+
+    storeIdempotencyResult(idempotencyKey, 200, response);
+
+    return c.json(response);
   } catch (err) {
     console.error('[ReplyEmail] Error:', err instanceof Error ? err.message : String(err));
+    storeIdempotencyError(idempotencyKey, 500, { error: err instanceof Error ? err.message : String(err) });
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });

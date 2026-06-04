@@ -2,6 +2,7 @@ import { mcpMailOutputChannel } from '../logger';
 import { getMailConfig, getSendMode, getRemoteUrl } from './config';
 import { getDefaultAttachmentsConfig } from '../sentMail/attachments';
 import { getSignatureConfig, stripHtml } from '../sentMail/signature';
+import { randomUUID } from 'crypto';
 
 export class RemoteMailClient {
   private sessionId: string | null = null;
@@ -96,6 +97,23 @@ export class RemoteMailClient {
         await this.connect();
         const newBody = { ...body, sessionId: this.sessionId };
         return this.request(path, newBody, method, signal);
+      }
+      throw error;
+    }
+  }
+
+  private async requestNoRetry(path: string, body: any, method: string = 'POST', signal?: AbortSignal): Promise<any> {
+    try {
+      return await this.request(path, body, method, signal);
+    } catch (error) {
+      const isSessionError = error instanceof Error &&
+        (error.message.includes('Session not found') || error.message.includes('sessionId'));
+      if (isSessionError) {
+        this.sessionId = null;
+        this.imapConnected = false;
+        this.smtpConnected = false;
+        mcpMailOutputChannel.error('[RemoteClient] Session expired during mutation request. Email may have been sent. Check your mailbox before retrying.');
+        throw new Error('Session expired during send. The email may have already been sent — please check your mailbox before retrying to avoid duplicates.');
       }
       throw error;
     }
@@ -363,7 +381,10 @@ export class RemoteMailClient {
       }
     }
 
-    return this.requestWithRetry('send-email', {
+    const idempotencyKey = `send-${Date.now()}-${randomUUID()}`;
+    mcpMailOutputChannel.info(`[RemoteClient] Idempotency key: ${idempotencyKey}`);
+
+    return this.requestNoRetry('send-email', {
       sessionId: this.sessionId,
       to: args.to,
       subject: args.subject,
@@ -372,6 +393,7 @@ export class RemoteMailClient {
       cc: args.cc,
       bcc: args.bcc,
       attachments: remoteAttachments.length > 0 ? remoteAttachments : undefined,
+      idempotencyKey,
     }, undefined, signal);
   }
 
@@ -420,7 +442,10 @@ export class RemoteMailClient {
       }
     }
 
-    return this.requestWithRetry('reply-email', {
+    const idempotencyKey = `reply-${Date.now()}-${randomUUID()}`;
+    mcpMailOutputChannel.info(`[RemoteClient] Idempotency key: ${idempotencyKey}`);
+
+    return this.requestNoRetry('reply-email', {
       sessionId: this.sessionId,
       originalUid: args.originalUid,
       text: textContent,
@@ -428,6 +453,7 @@ export class RemoteMailClient {
       replyToAll: args.replyToAll,
       includeOriginal: args.includeOriginal,
       attachments: remoteAttachments.length > 0 ? remoteAttachments : undefined,
+      idempotencyKey,
     }, undefined, signal);
   }
 }
