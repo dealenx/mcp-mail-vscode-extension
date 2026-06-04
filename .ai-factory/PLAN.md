@@ -1,193 +1,182 @@
-# Implementation Plan: Monorepo — core + service + vsix-extension
+# Implementation Plan: Shared Mailbox Support (Yandex 360)
 
 Branch: none (fast mode)
-Created: 2026-05-28
+Created: 2026-06-04
 
 ## Settings
 
 | Setting | Value |
 |---|---|
-| **Testing** | Yes — tests for core и service |
-| **Logging** | Verbose — DEBUG logs везде |
+| **Testing** | Yes — update existing tests |
+| **Logging** | Verbose — DEBUG logs |
 | **Docs** | No |
 
 ---
 
 ## Overview
 
-Реструктурировать проект в монорепо из 3 пакетов:
+Поддержка общих (shared) почтовых ящиков Яндекс 360. Ключевая проблема: для работы с общим ящиков нужны **разные** username для IMAP и SMTP, а также отдельный `fromAddress`:
 
 ```
-mcp-mail-vscode-extension/          ← root (workspaces)
-├── packages/
-│   ├── core/                        ← общие типы + IMAP/SMTP клиенты (0 vscode deps)
-│   ├── service/                     ← REST API сервер на Bun + Hono (smtp-remote.mimikkai)
-│   └── vsix-extension/              ← текущий VS Code extension (существующий src/)
-├── package.json                     ← workspaces root
-└── .ai-factory/
+IMAP username:  example.org/a.smith/support     (домен/пользователь/общий-ящик)
+SMTP username:  a.smith@example.org             (обычный email)
+FROM address:   support@example.org             (почта общего ящика)
 ```
 
-**Ключевая идея:** пользователь в VS Code переключает режим отправки:
-- **local** — IMAP/SMTP соединения создаются прямо в расширении (как сейчас)
-- **remote** — расширение делает HTTP-запросы к `packages/service`, передаёт конфиг, сервис создаёт соединение и выполняет операцию
+**Обратная совместимость — критически важна:** все новые поля optional. Если пользователь не заполняет новые настройки, поведение идентично текущему.
 
-**Service** — stateless-прокси: принял конфиг + данные → создал соединение → выполнил операцию → вернул результат → закрыл соединение. Без авторизации (пока).
-
-**Bun** используется для:
-- `packages/service` — сервер работает на Bun runtime
-- `packages/core` — типы и клиенты, совместимы с Bun
-- `packages/vsix-extension` — сборка через tsc (VS Code extension API не работает с Bun bundler), но зависимости ставятся через bun workspaces
+```
+imapUsername  → не задано → берём accountLogin (как сейчас)
+smtpUsername  → не задано → берём accountLogin (как сейчас)
+fromAddress   → не задано → берём smtpUsername (как сейчас)
+```
 
 ---
 
 ## Tasks
 
-### Phase 1: Monorepo Setup
+### Phase 1: Core Types — добавить fromAddress в SMTPConfig
 
-- [x] **Task 1: Создать структуру директорий и корневой package.json**
-  - Создать `packages/core/`, `packages/service/`, `packages/vsix-extension/`
-  - Создать корневой `package.json` с `"workspaces": ["packages/*"]`
-  - Перенести текущий `src/`, `package.json` (vsix-specific), `tsconfig.json`, `.vscodeignore`, `.vscode/` в `packages/vsix-extension/`
-  - Перенести `examples/` можно удалить или оставить на root уровне
-  - Обновить корневой `package.json` для bun workspaces
-  - Проверить что `bun install` работает
+- [x] **Task 1: Добавить fromAddress в SMTPConfig и MailConfig во всех пакетах**
+  - В `packages/core/src/types.ts`: добавить `fromAddress?: string` в `SMTPConfig`
+  - В `packages/service/src/core/types.ts`: то же самое
+  - В `packages/core/src/types.ts`: добавить `fromAddress` в `MailConfig.SMTP`
+  - В `packages/service/src/core/types.ts`: то же самое
+  - `fromAddress` — опциональное поле; если не задано, `SMTPClient` использует `username`
 
-  LOGGING: N/A (setup task)
+  LOGGING: N/A (type change only)
 
-  Files: package.json (root), packages/vsix-extension/package.json, packages/vsix-extension/tsconfig.json
+  Files: packages/core/src/types.ts, packages/service/src/core/types.ts
 
-- [x] **Task 2: Создать packages/core — общие типы и интерфейсы**
-  - Создать `packages/core/package.json` (name: `@mcp-mail/core`)
-  - Создать `packages/core/tsconfig.json`
-  - Вынести из vsix-extension в core:
-    - `src/mail/smtp-client.ts` → `packages/core/src/smtp-client.ts` (убрать vscode deps — их там нет)
-    - `src/mail/imap-client.ts` → `packages/core/src/imap-client.ts` (убрать vscode deps — их там нет)
-    - Создать `packages/core/src/types.ts` — общие интерфейсы: `IMAPConfig`, `SMTPConfig`, `MailConfig`, `EmailOptions`, `EmailResult`, `EmailMessage`, `AttachmentMeta`, `AttachmentData`, `SearchResult`, `SentMailRecord`
-  - Создать `packages/core/src/index.ts` — реэкспорт всего
-  - `SMTPConfig`, `IMAPConfig`, `EmailOptions`, `EmailResult` — вынести из smtp-client.ts в types.ts
-  - `EmailMessage`, `AttachmentMeta`, `AttachmentData`, `MailboxInfo` — вынести из imap-client.ts в types.ts
-  - Core НЕ зависит от vscode API
+### Phase 2: VS Code Extension — настройки и config
 
-  LOGGING: `[SMTP]` и `[IMAP]` префиксы сохраняются, console.error для core
+- [x] **Task 2: Добавить новые настройки VS Code в package.json**
+  - Добавить 3 новых свойства в `contributes.configuration.properties`:
+    - `mcpMail.imapUsername` (string, default: "", description: "IMAP логин (если отличается от основного). Для Яндекс 360 с общим ящиком: домен/пользователь/имя-ящика. Если пусто — используется accountLogin")
+    - `mcpMail.smtpUsername` (string, default: "", description: "SMTP логин (если отличается от основного). Если пусто — используется accountLogin")
+    - `mcpMail.fromAddress` (string, default: "", description: "Email для заголовка From (если отличается от SMTP логина). Для общих ящиков — email общего ящика. Если пусто — используется smtpUsername или accountLogin")
+  - Все 3 поля optional, с пустыми дефолтами — обратная совместимость гарантируется
 
-  Files: packages/core/package.json, packages/core/tsconfig.json, packages/core/src/types.ts, packages/core/src/smtp-client.ts, packages/core/src/imap-client.ts, packages/core/src/index.ts
+  LOGGING: N/A (config only)
 
-### Phase 2: Service — REST API
+  Files: packages/vsix-extension/package.json
 
-- [x] **Task 3: Создать packages/service — REST API на Bun + Hono**
-  - Создать `packages/service/package.json` (name: `@mcp-mail/service`)
-  - Установить Hono ( Bun-compatible HTTP framework)
-  - Зависимость: `"@mcp-mail/core": "workspace:*"`
-  - Создать `packages/service/tsconfig.json`
-  - Создать структуру:
+- [x] **Task 3: Обновить getMailConfig() в config.ts — fallback логика**
+  - Обновить `MailConfig` интерфейс в `config.ts` — добавить `fromAddress` в `SMTP`
+  - Обновить `getMailConfig()`:
     ```
-    packages/service/src/
-    ├── index.ts          ← Bun.serve() entry point
-    ├── routes/
-    │   ├── connect.ts    ← POST /api/connect     { imap, smtp } → { sessionId }
-    │   ├── disconnect.ts ← POST /api/disconnect  { sessionId }
-    │   ├── send-email.ts ← POST /api/send-email  { sessionId, to, subject, ... }
-    │   ├── reply-email.ts← POST /api/reply-email { sessionId, originalUid, text, ... }
-    │   ├── status.ts     ← GET  /api/status      { sessionId }
-    │   ├── mailboxes.ts  ← POST /api/mailboxes   { sessionId }
-    │   ├── search.ts     ← POST /api/search/*    { sessionId, criteria }
-    │   ├── messages.ts   ← POST /api/messages    { sessionId, uid }
-    │   └── attachments.ts← POST /api/attachments { sessionId, uid }
-    ├── session-manager.ts ← управление соединениями (Map<sessionId, {imap, smtp}>)
-    └── config.ts         ← типы конфигурации для API
+    const imapUsername = cfg.get<string>('imapUsername') || user;
+    const smtpUsername = cfg.get<string>('smtpUsername') || user;
+    const fromAddress  = cfg.get<string>('fromAddress')  || smtpUsername;
     ```
-  - Сессия: Stateless в смысле storage, но stateful в рамках запроса — соединение IMAP/SMTP создаётся при `/api/connect`, живёт в памяти service, закрывается при `/api/disconnect` или по таймауту (30 мин неактивности)
-  - API schema для каждого эндпоинта — Zod валидация на входе
-  - LOGGING: `[Service]` префикс, verbose на все операции, DEBUG на входящие запросы
+  - `IMAP.username = imapUsername`
+  - `SMTP.username = smtpUsername`
+  - `SMTP.fromAddress = fromAddress`
+  - Пароль остаётся общий (`accountPassword`) — Яндекс использует пароль приложения владельца
 
-  Files: packages/service/package.json, packages/service/tsconfig.json, packages/service/src/index.ts, packages/service/src/session-manager.ts, packages/service/src/config.ts, packages/service/src/routes/*.ts
+  LOGGING: `[Config]` префикс, DEBUG — логировать резолвнутые значения imapUsername, smtpUsername, fromAddress
 
-### Phase 3: VSIX Extension — Remote Mode
+  Files: packages/vsix-extension/src/mail/config.ts
 
-- [x] **Task 4: Добавить настройку remote mode в vsix-extension**
-  - Добавить в `package.json` → `contributes.configuration.properties`:
-    - `mcpMail.sendMode`: enum `["local", "remote"]`, default `"local"`, description: "Режим отправки: локально (прямо через SMTP/IMAP) или удалённо (через сервис)"
-    - `mcpMail.remoteUrl`: string, default `"https://smtp-service.mimikkai.ru"`, description: "URL удалённого сервиса"
-  - Создать `packages/vsix-extension/src/mail/config.ts` — обновить `getMailConfig()` чтобы включать `sendMode` и `remoteUrl`
+### Phase 3: SMTP Client — передать fromAddress в письма
 
-  LOGGING: `[Config]` префикс, DEBUG при чтении настроек
+- [x] **Task 4: Обновить SMTPClient — использовать fromAddress в поле from**
+  - Во всех 3 копиях SMTPClient (vsix, core, service):
+    - Добавить `fromAddress` в конфиг (из `SMTPConfig`)
+    - В `sendMail()`: `from: options.from || this.config.fromAddress || this.config.username`
+    - Это гарантирует что при отправке письма `From:` будет правильным
+  - Обратная совместимость: если `fromAddress` не задан → `from` = `username` (как сейчас)
 
-  Files: packages/vsix-extension/package.json, packages/vsix-extension/src/mail/config.ts
+  LOGGING: `[SMTP]` префикс, DEBUG — логировать итоговый `from` адрес при отправке
 
-- [x] **Task 5: Создать RemoteMailClient в vsix-extension**
-  - Создать `packages/vsix-extension/src/mail/remote-client.ts`
-  - Класс `RemoteMailClient` — HTTP-клиент к service, реализующий тот же интерфейс что и `MailService`
-  - Методы:
-    - `connect(config)` → `POST /api/connect` → sessionId
-    - `disconnect()` → `POST /api/disconnect`
-    - `sendEmail(args, signal?)` → `POST /api/send-email`
-    - `replyToEmail(args, signal?)` → `POST /api/reply-email`
-    - `listMailboxes()` → `POST /api/mailboxes`
-    - `searchBySender/Subject/Body/SinceDate/All(...)` → `POST /api/search/*`
-    - `getMessages(uids)` → `POST /api/messages`
-    - `getMessage(uid)` → `POST /api/messages/:uid`
-    - `deleteMessage(uid)` → `POST /api/messages/:uid/delete`
-    - `getAttachmentsMeta(uid)` → `POST /api/attachments/:uid`
-    - `saveAttachment(uid, index?)` → `POST /api/attachments/:uid/save`
-  - Хранит sessionId между вызовами
-  - Error handling: если sessionId протух — реконнект автоматически
-  - LOGGING: `[RemoteClient]` префикс, DEBUG на каждый HTTP-запрос/ответ
+  Files:
+  - packages/vsix-extension/src/mail/smtp-client.ts
+  - packages/core/src/smtp-client.ts
+  - packages/service/src/core/smtp-client.ts
+
+### Phase 4: MailService — передавать fromAddress при отправке
+
+- [x] **Task 5: Обновить MailService.sendEmail() — передавать from в EmailOptions**
+  - В `mailService.ts` `sendEmail()`:
+    - Считать `fromAddress` из `config.SMTP.fromAddress`
+    - Передать `from: config.SMTP.fromAddress` в `emailOptions` (если задан)
+  - В `mailService.ts` `replyToEmail()`:
+    - То же самое — передать `from: config.SMTP.fromAddress`
+  - В `mailService.ts` `buildRawEmailMessage()`:
+    - Заменить `From: ${config.IMAP.username}` на `From: ${config.SMTP.fromAddress}` (использует fromAddress из SMTP конфига)
+  - Возвращать `from: config.SMTP.fromAddress || config.SMTP.username` в результатах
+
+  LOGGING: `[MailService]` префикс, INFO — логировать используемый from-адрес
+
+  Files: packages/vsix-extension/src/mail/mailService.ts
+
+### Phase 5: Remote Service — прокидка fromAddress
+
+- [x] **Task 6: Обновить RemoteMailClient — передавать fromAddress при connect и send**
+  - В `remote-client.ts` `connect()`:
+    - Передать `fromAddress` в теле запроса `connect`:
+      ```typescript
+      smtp: {
+        host: config.SMTP.host,
+        port: config.SMTP.port,
+        username: config.SMTP.username,
+        password: config.SMTP.password,
+        secure: config.SMTP.secure,
+        fromAddress: config.SMTP.fromAddress, // НОВОЕ
+      }
+      ```
+  - В `remote-client.ts` `sendEmail()`:
+    - Передать `fromAddress` в теле запроса `send-email`
+
+  LOGGING: `[RemoteClient]` префикс, DEBUG — логировать fromAddress при передаче
 
   Files: packages/vsix-extension/src/mail/remote-client.ts
 
-- [x] **Task 6: Обновить MailService — режим local/remote switch**
-  - Модифицировать `packages/vsix-extension/src/mail/mailService.ts`
-  - Создать интерфейс `IMailService` с методами: `sendEmail`, `replyToEmail`, `listMailboxes`, `searchBySender/Subject/Body/SinceDate/All`, `getMessages`, `getMessage`, `deleteMessage`, `getAttachmentsMeta`, `saveAttachment`, `ensureIMAPConnection`, `ensureSMTPConnection`, `getConnectionStatus`, `disconnectAll`
-  - `MailService` реализует `IMailService` (локальный режим, как сейчас)
-  - `RemoteMailClient` реализует `IMailService` (удалённый режим)
-  - Создать фабрику `createMailService(): IMailService` — читает `mcpMail.sendMode` из настроек, возвращает RemoteMailClient или MailService
-  - В `mailTools.ts` использовать фабрику вместо `new MailService()`
-  - Обработать переключение режима: при изменении настройки `sendMode` — пересоздать сервис
-  - LOGGING: `[MailService]` префикс, INFO при переключении режима
+- [x] **Task 7: Обновить Service connect route — принимать fromAddress**
+  - В `packages/service/src/routes/connect.ts`:
+    - Добавить `fromAddress` в `connectSchema` для SMTP (optional string)
+    - Передать в `createSession()` → `session.smtpConfig.fromAddress`
+  - В `packages/service/src/core/types.ts`: убедиться что `SMTPConfig` содержит `fromAddress`
+  - В `packages/service/src/session-manager.ts`: `SessionConnections.smtpConfig` уже хранит `SMTPConfig`, новый字段 автоматически сохранится
 
-  Files: packages/vsix-extension/src/mail/mailService.ts, packages/vsix-extension/src/mail/mailService.ts (interface), packages/vsix-extension/src/mailTools.ts, packages/vsix-extension/src/extension.ts
+  LOGGING: `[Connect]` префикс, DEBUG — логировать fromAddress при создании сессии
 
-### Phase 4: Core — Tests
+  Files: packages/service/src/routes/connect.ts, packages/service/src/core/types.ts
 
-- [x] **Task 7: Тесты для packages/core**
-  - Создать `packages/core/tests/smtp-client.test.ts`
-  - Создать `packages/core/tests/imap-client.test.ts`
-  - Создать `packages/core/tests/types.test.ts`
-  - Использовать Bun test runner (`bun test`)
-  - Тесты типов: валидация интерфейсов
-  - Тесты SMTPClient: мок nodemailer, проверка connect/sendMail/disconnect
-  - Тесты IMAPClient: мок imap, проверка connect/search/fetch/disconnect
+- [x] **Task 8: Обновить Service send-email и reply-email — использовать fromAddress**
+  - В `send-email.ts`:
+    - Заменить `from: session.smtpConfig.username` на `from: session.smtpConfig.fromAddress || session.smtpConfig.username`
+    - В `buildRawEmailMessage`: передать `fromAddress` вместо `fromEmail` и использовать его в заголовке `From:`
+  - В `reply-email.ts`:
+    - То же самое — использовать `fromAddress || username` для `from`
+  - В `reply-email.ts`: обновить фильтрацию `email !== session.imapConfig.username` — также учитывать `fromAddress`
+
+  LOGGING: `[SendEmail]`, `[ReplyEmail]` — DEBUG логировать итоговый from-адрес
+
+  Files: packages/service/src/routes/send-email.ts, packages/service/src/routes/reply-email.ts
+
+### Phase 6: VS Code Sidebar — тестовое письмо с правильным from
+
+- [x] **Task 9: Обновить sidebar тестовой отправки — использовать fromAddress**
+  - В `mailSidebar.ts` строки 374 и 390: заменить `from: config.SMTP.username` на `from: config.SMTP.fromAddress || config.SMTP.username`
+  - Это влияет на отправку тестового письма из sidebar
+
+  LOGGING: `[Sidebar]` — DEBUG логировать from-адрес при тестовой отправке
+
+  Files: packages/vsix-extension/src/mailSidebar.ts
+
+### Phase 7: Тесты
+
+- [x] **Task 10: Обновить тесты для проверки fromAddress и fallback**
+  - В `packages/core/tests/types.test.ts`: добавить тесты для `SMTPConfig` с `fromAddress` и без
+  - В `packages/service/tests/api.test.ts`: обновить connect-тест — передать `fromAddress` в SMTP конфиг
+  - Добавить тест: connect без fromAddress → SMTP username используется как from
+  - Добавить тест: connect с fromAddress → fromAddress используется как from
+  - В `packages/vsix-extension/src/test/mail/smtpClient.test.ts`: добавить тесты для fromAddress в sendMail
 
   LOGGING: verbose в тестах
 
-  Files: packages/core/tests/*.test.ts
-
-- [x] **Task 8: Тесты для packages/service API**
-  - Создать `packages/service/tests/` директорию
-  - Использовать Bun test runner + Hono test helper
-  - Тесты для каждого эндпоинта:
-    - `connect.test.ts` — валидный конфиг → sessionId, невалидный → 400
-    - `send-email.test.ts` — мок SMTP, проверка payload
-    - `disconnect.test.ts` — корректное завершение сессии
-    - `search.test.ts` — мок IMAP, проверка критериев
-  - Интеграционный тест: connect → sendEmail → disconnect
-
-  LOGGING: verbose в тестах
-
-  Files: packages/service/tests/*.test.ts
-
-### Phase 5: Wiring & Cleanup
-
-- [x] **Task 9: Обновить imports и сборку vsix-extension**
-  - Обновить все `import` в vsix-extension чтобы ссылаться на `@mcp-mail/core` вместо `./mail/imap-client` и `./mail/smtp-client`
-  - Обновить `tsconfig.json` в vsix-extension для разрешения workspace-пакетов (paths или moduleResolution)
-  - Проверить что `bun install` работает на root уровне
-  - Проверить что `tsc -p packages/vsix-extension` компиливается
-  - Проверить что `bun test` работает в core и service
-  - Удалить дублирующиеся типы из vsix-extension/src/mail/ (smtp-client.ts и imap-client.ts — заменить на re-export из @mcp-mail/core или удалить)
-  - LOGGING: N/A (wiring task)
-
-  Files: packages/vsix-extension/tsconfig.json, packages/vsix-extension/src/mail/imap-client.ts (delete or re-export), packages/vsix-extension/src/mail/smtp-client.ts (delete or re-export), packages/vsix-extension/src/mail/mailService.ts
+  Files: packages/core/tests/types.test.ts, packages/service/tests/api.test.ts, packages/vsix-extension/src/test/mail/smtpClient.test.ts
 
 ---
 
@@ -195,52 +184,86 @@ mcp-mail-vscode-extension/          ← root (workspaces)
 
 | Commit | Tasks | Message |
 |---|---|---|
-| **1** | 1–2 | `feat(mono): set up monorepo structure and extract core package` |
-| **2** | 3 | `feat(service): add REST API service with Bun + Hono` |
-| **3** | 4–6 | `feat(vsix): add remote/local send mode switch and remote client` |
-| **4** | 7–8 | `test: add tests for core and service packages` |
-| **5** | 9 | `refactor: update imports and clean up vsix-extension` |
+| **1** | 1–3 | `feat: add shared mailbox support — separate IMAP/SMTP username and fromAddress` |
+| **2** | 4–5 | `feat: use fromAddress in SMTP sending and MailService` |
+| **3** | 6–8 | `feat: propagate fromAddress through remote service and API` |
+| **4** | 9 | `fix: use fromAddress in sidebar test email` |
+| **5** | 10 | `test: add fromAddress and shared mailbox tests` |
 
 ---
 
 ## Architecture Diagram
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│  packages/core (@mcp-mail/core)                                    │
-│  ├── types.ts        IMAPConfig, SMTPConfig, EmailOptions, ...    │
-│  ├── smtp-client.ts  SMTPClient (nodemailer, 0 vscode deps)       │
-│  ├── imap-client.ts  IMAPClient (imap lib, 0 vscode deps)         │
-│  └── index.ts        re-exports                                    │
-├────────────────────────────────────────────────────────────────────┤
-│  packages/service (@mcp-mail/service)  [Bun + Hono]               │
-│  ├── src/index.ts        Bun.serve({ port: 3000 })                │
-│  ├── src/session-manager.ts   Map<sessionId, {imap,smtp}>         │
-│  └── src/routes/                                                  │
-│      ├── connect.ts      POST /api/connect                        │
-│      ├── disconnect.ts   POST /api/disconnect                     │
-│      ├── send-email.ts   POST /api/send-email                     │
-│      ├── reply-email.ts  POST /api/reply-email                    │
-│      ├── status.ts       GET  /api/status                         │
-│      ├── mailboxes.ts    POST /api/mailboxes                      │
-│      ├── search.ts       POST /api/search/*                       │
-│      ├── messages.ts     POST /api/messages                       │
-│      └── attachments.ts  POST /api/attachments                    │
-├────────────────────────────────────────────────────────────────────┤
-│  packages/vsix-extension (current src/)                           │
-│  ├── src/mail/config.ts        reads mcpMail.* settings            │
-│  ├── src/mail/remote-client.ts  HTTP client → service              │
-│  ├── src/mail/mailService.ts   IMailService interface + local impl │
-│  ├── src/mailTools.ts          Tool classes (use IMailService)     │
-│  └── src/extension.ts          activate()                         │
-└────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│  VS Code Settings (package.json)                                        │
+│                                                                          │
+│  mcpMail.accountLogin     → основной логин (обязательный)               │
+│  mcpMail.accountPassword  → пароль приложения (обязательный)            │
+│  mcpMail.imapUsername     → IMAP логин (optional, fallback=accountLogin)│
+│  mcpMail.smtpUsername     → SMTP логин (optional, fallback=accountLogin)│
+│  mcpMail.fromAddress      → From: email  (optional, fallback=smtpUsername)│
+│                                                                          │
+│  ┌─── Обычный ящик ──────────────────────────────────────────────────┐  │
+│  │ accountLogin = "user@yandex.ru"                                   │  │
+│  │ imapUsername  = ""  → fallback "user@yandex.ru"                    │  │
+│  │ smtpUsername  = ""  → fallback "user@yandex.ru"                    │  │
+│  │ fromAddress   = ""  → fallback "user@yandex.ru"                    │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+│                                                                          │
+│  ┌─── Общий ящик (shared) ───────────────────────────────────────────┐  │
+│  │ accountLogin   = "example.org/a.smith/support"                    │  │
+│  │ imapUsername   = "example.org/a.smith/support" ← то же самое     │  │
+│  │ smtpUsername   = "a.smith@example.org"        ← отличается!       │  │
+│  │ fromAddress    = "support@example.org"         ← отличается!       │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────┘
 
-  User flow — LOCAL mode:
-    vsix-extension → MailService → SMTPClient/IMAPClient → mail server
+┌──────────────────────────────────────────────────────────────────────────┐
+│  MailConfig (config.ts) — resolution logic                              │
+│                                                                          │
+│  IMAP.username  = imapUsername  || accountLogin                        │
+│  SMTP.username   = smtpUsername  || accountLogin                        │
+│  SMTP.fromAddress = fromAddress   || smtpUsername || accountLogin       │
+│  IMAP.password  = accountPassword (общий)                               │
+│  SMTP.password  = accountPassword (общий)                               │
+└──────────────────────────────────────────────────────────────────────────┘
 
-  User flow — REMOTE mode:
-    vsix-extension → RemoteMailClient → HTTP → service → SMTPClient/IMAPClient → mail server
+┌──────────────────────────────────────────────────────────────────────────┐
+│  SMTPClient.sendMail() — from resolution                                │
+│                                                                          │
+│  mailOptions.from = options.from || config.fromAddress || config.username│
+│                                                                          │
+│  → если fromAddress задан — письмо придёт от общего ящика              │
+│  → если не задан — от username (обратная совместимость)                │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
+
+## Backward Compatibility Guarantee
+
+Для пользователей, которые НЕ заполняют новые поля:
+
+```
+imapUsername  = ""  → resolve to accountLogin  → IMAP логин как раньше
+smtpUsername  = ""  → resolve to accountLogin  → SMTP логин как раньше
+fromAddress   = ""  → resolve to smtpUsername → resolves to accountLogin → From: как раньше
+```
+
+**Результат: нулевое изменение поведения для существующих конфигураций.**
+
+## Яндекс 360 Shared Mailbox — Cheat Sheet
+
+| Протокол | Поле            | Значение                               |
+|----------|----------------|----------------------------------------|
+| IMAP     | username       | `example.org/a.smith/support`          |
+| IMAP     | password       | пароль приложения a.smith              |
+| IMAP     | host           | `imap.yandex.ru`                       |
+| IMAP     | port           | 993                                    |
+| SMTP     | username       | `a.smith@example.org`                 |
+| SMTP     | password       | пароль приложения a.smith (ТОТ ЖЕ!)  |
+| SMTP     | host           | `smtp.yandex.ru`                       |
+| SMTP     | port           | 465                                    |
+| Email    | From:          | `support@example.org`                  |
 
 ## Next Steps
 
