@@ -48,10 +48,9 @@ export function getMailConfig(): MailConfig {
   }
 
   const imapUsername = cfg.get<string>('imapUsername') || user;
-  const smtpUsername = cfg.get<string>('smtpUsername') || user;
-  const fromAddress = cfg.get<string>('fromAddress') || smtpUsername;
+  const fromAddress  = cfg.get<string>('fromAddress')  || user;
 
-  console.error(`[Config] Resolved credentials: imapUsername=${imapUsername}, smtpUsername=${smtpUsername}, fromAddress=${fromAddress}`);
+  console.error(`[Config] Resolved credentials: imapUsername=${imapUsername}, smtpUsername=${user}, fromAddress=${fromAddress}`);
 
   return {
     IMAP: {
@@ -64,7 +63,7 @@ export function getMailConfig(): MailConfig {
     SMTP: {
       host: smtpHost,
       port: smtpPort,
-      username: smtpUsername,
+      username: user,
       password: pass,
       secure: smtpSecure,
       fromAddress,

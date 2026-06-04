@@ -2,8 +2,8 @@
   "name": "mcp-mail-vscode-extension",
   "displayName": "MCP Mail for VS Code Copilot",
   "description": "Mail tools (IMAP/SMTP) for VS Code Copilot via languageModelTools API",
-  "version": "0.8.0",
-  "publisher": "dealenx",
+  "version": "0.8.3",
+  "publisher": "dealenx-dev",
   "engines": {
     "vscode": "^1.100.0"
   },
@@ -141,32 +141,26 @@
         "mcpMail.accountLogin": {
           "type": "string",
           "default": "",
-          "description": "Логин почты (используется для IMAP и SMTP, если не заданы отдельные поля)",
+          "description": "Основной логин почты. Используется для IMAP и SMTP, если не заполнены отдельные поля. Пример: user@example.org",
           "order": 7
         },
         "mcpMail.accountPassword": {
           "type": "string",
           "default": "",
-          "description": "Пароль почты (используется для IMAP и SMTP)",
+          "description": "Пароль приложения почты (одинаковый для IMAP и SMTP)",
           "order": 8
         },
         "mcpMail.imapUsername": {
           "type": "string",
           "default": "",
-          "description": "IMAP логин (если отличается от основного). Для Яндекс 360 с общим ящиком: домен/пользователь/имя-ящика. Если пусто — используется accountLogin",
+          "description": "IMAP логин — заполнять только если отличается от основного. Для общего ящика Яндекс 360: домен/пользователь/ящик, пример: example.org/user/shared. Если пусто — используется accountLogin",
           "order": 9
-        },
-        "mcpMail.smtpUsername": {
-          "type": "string",
-          "default": "",
-          "description": "SMTP логин (если отличается от основного). Если пусто — используется accountLogin",
-          "order": 10
         },
         "mcpMail.fromAddress": {
           "type": "string",
           "default": "",
-          "description": "Email для заголовка From (если отличается от SMTP логина). Для общих ящиков — email общего ящика. Если пусто — используется smtpUsername или accountLogin",
-          "order": 11
+          "description": "Адрес отправителя (From:) — заполнять только если отличается от основного логина. Для общего ящика: email общего ящика, пример: shared@example.org. Если пусто — используется accountLogin",
+          "order": 10
         },
         "mcpMail.signature": {
           "type": "string",
