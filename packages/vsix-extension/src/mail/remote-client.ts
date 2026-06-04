@@ -152,6 +152,7 @@ export class RemoteMailClient {
         username: config.SMTP.username,
         password: config.SMTP.password,
         secure: config.SMTP.secure,
+        fromAddress: config.SMTP.fromAddress,
       },
     });
 
@@ -384,8 +385,11 @@ export class RemoteMailClient {
     const idempotencyKey = `send-${Date.now()}-${randomUUID()}`;
     mcpMailOutputChannel.info(`[RemoteClient] Idempotency key: ${idempotencyKey}`);
 
+    const config = getMailConfig();
+
     return this.requestNoRetry('send-email', {
       sessionId: this.sessionId,
+      from: config.SMTP.fromAddress,
       to: args.to,
       subject: args.subject,
       text: textContent,
@@ -445,8 +449,11 @@ export class RemoteMailClient {
     const idempotencyKey = `reply-${Date.now()}-${randomUUID()}`;
     mcpMailOutputChannel.info(`[RemoteClient] Idempotency key: ${idempotencyKey}`);
 
+    const config = getMailConfig();
+
     return this.requestNoRetry('reply-email', {
       sessionId: this.sessionId,
+      from: config.SMTP.fromAddress,
       originalUid: args.originalUid,
       text: textContent,
       html: htmlContent,

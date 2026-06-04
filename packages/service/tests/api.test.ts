@@ -1,6 +1,15 @@
 import { describe, test, expect } from 'bun:test';
-import { Hono } from 'hono';
+import { z } from 'zod';
 import app from '../src/index';
+
+const smtpSchemaWithFromAddress = z.object({
+  host: z.string().min(1),
+  port: z.number().int().positive(),
+  username: z.string().min(1),
+  password: z.string().min(1),
+  secure: z.boolean().optional().default(true),
+  fromAddress: z.string().optional(),
+});
 
 describe('Service API - Validation Tests (using Hono test)', () => {
   test('GET / should return service info', async () => {
@@ -30,6 +39,35 @@ describe('Service API - Validation Tests (using Hono test)', () => {
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toBe('Invalid request');
+  });
+
+  test('SMTP schema should accept fromAddress', () => {
+    const result = smtpSchemaWithFromAddress.safeParse({
+      host: 'smtp.example.com',
+      port: 465,
+      username: 'a.smith@example.org',
+      password: 'pass',
+      secure: true,
+      fromAddress: 'shared@example.org',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect((result.data as any).fromAddress).toBe('shared@example.org');
+    }
+  });
+
+  test('SMTP schema should work without fromAddress (backward compat)', () => {
+    const result = smtpSchemaWithFromAddress.safeParse({
+      host: 'smtp.example.com',
+      port: 465,
+      username: 'user@example.com',
+      password: 'pass',
+      secure: true,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect((result.data as any).fromAddress).toBeUndefined();
+    }
   });
 
   test('POST /api/disconnect with missing sessionId should return 400', async () => {

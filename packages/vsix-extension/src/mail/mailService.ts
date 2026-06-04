@@ -411,6 +411,7 @@ export class MailService {
     const config = getMailConfig();
 
     const emailOptions: EmailOptions = {
+      from: config.SMTP.fromAddress,
       to: args.to.split(',').map((e) => e.trim()),
       subject: args.subject,
       text: args.text,
@@ -477,7 +478,7 @@ export class MailService {
     return {
       ...result,
       sentFolderSaved,
-      from: config.SMTP.username,
+      from: config.SMTP.fromAddress || config.SMTP.username,
     };
   }
 
@@ -504,7 +505,7 @@ export class MailService {
       const originalTo = this.extractEmailsFromAddressField(original.to);
       const originalCc = this.extractEmailsFromAddressField(original.cc);
       const filtered = [...originalTo, ...originalCc].filter(
-        (email) => email !== config.IMAP.username && email !== originalFrom
+        (email) => email !== config.IMAP.username && email !== config.SMTP.fromAddress && email !== originalFrom
       );
       if (filtered.length > 0) ccRecipients = filtered;
     }
@@ -543,6 +544,7 @@ export class MailService {
     }
 
     const emailOptions: EmailOptions = {
+      from: config.SMTP.fromAddress,
       to: toRecipients,
       cc: ccRecipients.length > 0 ? ccRecipients : undefined,
       subject,
@@ -581,7 +583,7 @@ export class MailService {
       sentFolderSaved,
       subject,
       to: originalFrom,
-      from: config.SMTP.username,
+      from: config.SMTP.fromAddress || config.SMTP.username,
     };
   }
 
@@ -626,7 +628,7 @@ export class MailService {
     let raw = '';
     raw += `Message-ID: ${msgId}\r\n`;
     raw += `Date: ${now.toUTCString()}\r\n`;
-    raw += `From: ${config.IMAP.username}\r\n`;
+    raw += `From: ${config.SMTP.fromAddress || config.SMTP.username}\r\n`;
     raw += `To: ${Array.isArray(emailOptions.to) ? emailOptions.to.join(', ') : emailOptions.to}\r\n`;
 
     if (emailOptions.cc) {

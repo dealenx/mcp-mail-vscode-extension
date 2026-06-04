@@ -371,7 +371,7 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
               }
 
               await client.sendMail({
-                from: config.SMTP.username,
+                from: config.SMTP.fromAddress,
                 to: recipient,
                 subject: 'Тестовое письмо — MCP Mail',
                 text: mailText,
@@ -387,7 +387,7 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
             if (sentMailHistory) {
               try {
                 await sentMailHistory.save({
-                  from: config.SMTP.username,
+                  from: config.SMTP.fromAddress || config.SMTP.username,
                   to: recipient,
                   subject: 'Тестовое письмо — MCP Mail',
                   text: mailText,

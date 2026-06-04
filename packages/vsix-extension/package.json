@@ -141,7 +141,7 @@
         "mcpMail.accountLogin": {
           "type": "string",
           "default": "",
-          "description": "Логин почты (используется для IMAP и SMTP)",
+          "description": "Логин почты (используется для IMAP и SMTP, если не заданы отдельные поля)",
           "order": 7
         },
         "mcpMail.accountPassword": {
@@ -150,18 +150,36 @@
           "description": "Пароль почты (используется для IMAP и SMTP)",
           "order": 8
         },
+        "mcpMail.imapUsername": {
+          "type": "string",
+          "default": "",
+          "description": "IMAP логин (если отличается от основного). Для Яндекс 360 с общим ящиком: домен/пользователь/имя-ящика. Если пусто — используется accountLogin",
+          "order": 9
+        },
+        "mcpMail.smtpUsername": {
+          "type": "string",
+          "default": "",
+          "description": "SMTP логин (если отличается от основного). Если пусто — используется accountLogin",
+          "order": 10
+        },
+        "mcpMail.fromAddress": {
+          "type": "string",
+          "default": "",
+          "description": "Email для заголовка From (если отличается от SMTP логина). Для общих ящиков — email общего ящика. Если пусто — используется smtpUsername или accountLogin",
+          "order": 11
+        },
         "mcpMail.signature": {
           "type": "string",
           "default": "",
           "description": "HTML подпись для email. Для plain text писем HTML-теги автоматически удалятся.",
           "editPresentation": "multilineText",
-          "order": 9
+          "order": 12
         },
         "mcpMail.signatureEnabled": {
           "type": "boolean",
           "default": true,
           "description": "Автоматически добавлять подпись к каждому отправляемому письму",
-          "order": 11
+          "order": 13
         },
         "mcpMail.defaultAttachments": {
           "type": "array",
@@ -170,13 +188,13 @@
           "items": {
             "type": "string"
           },
-          "order": 12
+          "order": 14
         },
         "mcpMail.defaultAttachmentsEnabled": {
           "type": "boolean",
           "default": true,
           "description": "Автоматически прикреплять указанные файлы к каждому отправляемому письму",
-          "order": 13
+          "order": 15
         },
         "mcpMail.sendMode": {
           "type": "string",
@@ -186,13 +204,13 @@
             "remote"
           ],
           "description": "Режим отправки: local — прямо через SMTP/IMAP (по умолчанию), remote — через удалённый сервис",
-          "order": 14
+          "order": 16
         },
         "mcpMail.remoteUrl": {
           "type": "string",
           "default": "https://smtp-service.mimikkai.ru",
           "description": "URL удалённого сервиса для отправки писем (используется только в режиме remote)",
-          "order": 15
+          "order": 17
         }
       }
     },

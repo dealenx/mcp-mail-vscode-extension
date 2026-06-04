@@ -197,6 +197,18 @@ describe('SMTPClient.connect', () => {
     const client = new SMTPClient(config);
     assert.strictEqual(client.getCurrentUsername(), 'testuser@test.com');
   });
+
+  it('should use fromAddress as from when provided', () => {
+    const config = { host: 'localhost', port: 587, username: 'a.smith@example.org', password: 'pass', fromAddress: 'support@example.org' };
+    const client = new SMTPClient(config);
+    assert.strictEqual(client.getCurrentUsername(), 'a.smith@example.org');
+  });
+
+  it('should fall back to username as from when fromAddress is not provided', () => {
+    const config = { host: 'localhost', port: 587, username: 'testuser@test.com', password: 'pass' };
+    const client = new SMTPClient(config);
+    assert.strictEqual(client.getCurrentUsername(), 'testuser@test.com');
+  });
 });
 
 describe('SMTPClient.disconnect', () => {

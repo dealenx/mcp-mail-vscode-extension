@@ -41,7 +41,7 @@ export class SMTPClient {
     }
 
     const mailOptions = {
-      from: options.from || this.config.username,
+      from: options.from || this.config.fromAddress || this.config.username,
       to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
       cc: options.cc ? (Array.isArray(options.cc) ? options.cc.join(', ') : options.cc) : undefined,
       bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc.join(', ') : options.bcc) : undefined,

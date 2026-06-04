@@ -9,6 +9,7 @@ export const replyEmailRouter = new Hono();
 const replyEmailSchema = z.object({
   sessionId: z.string().min(1),
   originalUid: z.number().int().positive(),
+  from: z.string().optional(),
   text: z.string().optional(),
   html: z.string().optional(),
   replyToAll: z.boolean().optional().default(false),
@@ -31,7 +32,7 @@ replyEmailRouter.post('/', async (c) => {
       return c.json({ error: 'Invalid request', details: parsed.error.errors }, 400);
     }
 
-    const { sessionId, originalUid, text, html, replyToAll, includeOriginal, attachments } = parsed.data;
+    const { sessionId, originalUid, from, text, html, replyToAll, includeOriginal, attachments } = parsed.data;
     idempotencyKey = parsed.data.idempotencyKey;
 
     if (!text && !html) {
@@ -79,7 +80,7 @@ replyEmailRouter.post('/', async (c) => {
       const originalTo = (original.to || '').split(',').map((e: string) => e.trim()).filter(Boolean);
       const originalCc = (original.cc || '').split(',').map((e: string) => e.trim()).filter(Boolean);
       const filtered = [...originalTo, ...originalCc].filter(
-        (email: string) => email !== session.imapConfig.username && email !== originalFrom
+        (email: string) => email !== session.imapConfig.username && email !== (session.smtpConfig.fromAddress || session.smtpConfig.username) && email !== originalFrom
       );
       if (filtered.length > 0) ccRecipients = filtered;
     }
@@ -100,6 +101,7 @@ replyEmailRouter.post('/', async (c) => {
     }
 
     const emailOptions: any = {
+      from: from || session.smtpConfig.fromAddress || session.smtpConfig.username,
       to: toRecipients,
       cc: ccRecipients.length > 0 ? ccRecipients : undefined,
       subject: replySubject,
@@ -122,7 +124,7 @@ replyEmailRouter.post('/', async (c) => {
     try {
       const sentMailbox = await findSentMailbox(imap);
       if (sentMailbox) {
-        const rawMessage = buildRawEmailMessage(emailOptions, result.messageId, session.imapConfig.username);
+        const rawMessage = buildRawEmailMessage(emailOptions, result.messageId, session.smtpConfig.fromAddress || session.smtpConfig.username);
         await imap.saveMessageToFolder(rawMessage, sentMailbox);
         sentFolderResult.saved = true;
       }
@@ -137,7 +139,7 @@ replyEmailRouter.post('/', async (c) => {
       sentFolderSaved: sentFolderResult.saved,
       subject: replySubject,
       to: originalFrom,
-      from: session.smtpConfig.username,
+      from: session.smtpConfig.fromAddress || session.smtpConfig.username,
     };
 
     storeIdempotencyResult(idempotencyKey, 200, response);

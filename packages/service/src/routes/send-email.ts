@@ -7,6 +7,7 @@ export const sendEmailRouter = new Hono();
 
 const sendEmailSchema = z.object({
   sessionId: z.string().min(1),
+  from: z.string().optional(),
   to: z.string().min(1),
   subject: z.string().min(1),
   text: z.string().optional(),
@@ -31,7 +32,7 @@ sendEmailRouter.post('/', async (c) => {
       return c.json({ error: 'Invalid request', details: parsed.error.errors }, 400);
     }
 
-    const { sessionId, to, subject, text, html, cc, bcc, attachments } = parsed.data;
+    const { sessionId, from, to, subject, text, html, cc, bcc, attachments } = parsed.data;
     idempotencyKey = parsed.data.idempotencyKey;
 
     if (!text && !html) {
@@ -53,6 +54,7 @@ sendEmailRouter.post('/', async (c) => {
     const session = validateSession(sessionId);
 
     const emailOptions: any = {
+      from: from || session.smtpConfig.fromAddress || session.smtpConfig.username,
       to: to.includes(',') ? to.split(',').map((e: string) => e.trim()) : to,
       subject,
       text,
@@ -77,7 +79,7 @@ sendEmailRouter.post('/', async (c) => {
       const imap = await getIMAPClient(sessionId);
       const sentMailbox = await findSentMailbox(imap);
       if (sentMailbox) {
-        const rawMessage = buildRawEmailMessage(emailOptions, result.messageId, session.smtpConfig.username);
+        const rawMessage = buildRawEmailMessage(emailOptions, result.messageId, session.smtpConfig.fromAddress || session.smtpConfig.username);
         await imap.saveMessageToFolder(rawMessage, sentMailbox);
         sentFolderResult.saved = true;
       }
@@ -88,7 +90,7 @@ sendEmailRouter.post('/', async (c) => {
     const response = {
       ...result,
       sentFolderSaved: sentFolderResult.saved,
-      from: session.smtpConfig.username,
+      from: session.smtpConfig.fromAddress || session.smtpConfig.username,
     };
 
     storeIdempotencyResult(idempotencyKey, 200, response);

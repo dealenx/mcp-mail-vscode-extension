@@ -40,6 +40,29 @@ describe('Types', () => {
     expect(config.secure).toBe(true);
   });
 
+  test('SMTPConfig should support optional fromAddress', () => {
+    const config: SMTPConfig = {
+      host: 'smtp.example.com',
+      port: 465,
+      username: 'a.smith@example.org',
+      password: 'secret',
+      secure: true,
+      fromAddress: 'support@example.org',
+    };
+    expect(config.fromAddress).toBe('support@example.org');
+  });
+
+  test('SMTPConfig without fromAddress falls back to username', () => {
+    const config: SMTPConfig = {
+      host: 'smtp.example.com',
+      port: 465,
+      username: 'user@example.com',
+      password: 'secret',
+      secure: true,
+    };
+    expect(config.fromAddress).toBeUndefined();
+  });
+
   test('MailConfig should combine IMAP and SMTP configs', () => {
     const config: MailConfig = {
       IMAP: {
@@ -55,10 +78,35 @@ describe('Types', () => {
         username: 'user@example.com',
         password: 'secret',
         secure: true,
+        fromAddress: 'user@example.com',
       },
     };
     expect(config.IMAP.host).toBe('imap.example.com');
     expect(config.SMTP.host).toBe('smtp.example.com');
+    expect(config.SMTP.fromAddress).toBe('user@example.com');
+  });
+
+  test('MailConfig should support shared mailbox pattern', () => {
+    const config: MailConfig = {
+      IMAP: {
+        host: 'imap.yandex.ru',
+        port: 993,
+        username: 'example.org/a.smith/support',
+        password: 'secret',
+        tls: true,
+      },
+      SMTP: {
+        host: 'smtp.yandex.ru',
+        port: 465,
+        username: 'a.smith@example.org',
+        password: 'secret',
+        secure: true,
+        fromAddress: 'support@example.org',
+      },
+    };
+    expect(config.IMAP.username).toBe('example.org/a.smith/support');
+    expect(config.SMTP.username).toBe('a.smith@example.org');
+    expect(config.SMTP.fromAddress).toBe('support@example.org');
   });
 
   test('EmailOptions should support all fields', () => {

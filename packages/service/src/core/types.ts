@@ -16,6 +16,7 @@ export interface SMTPConfig {
   secure?: boolean;
   username: string;
   password: string;
+  fromAddress?: string;
 }
 
 export interface MailConfig {
@@ -32,6 +33,7 @@ export interface MailConfig {
     username: string;
     password: string;
     secure: boolean;
+    fromAddress: string;
   };
 }
 

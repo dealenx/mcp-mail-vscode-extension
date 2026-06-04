@@ -14,6 +14,7 @@ export interface MailConfig {
     username: string;
     password: string;
     secure: boolean;
+    fromAddress: string;
   };
   sendMode: 'local' | 'remote';
   remoteUrl: string;
@@ -46,20 +47,27 @@ export function getMailConfig(): MailConfig {
     );
   }
 
+  const imapUsername = cfg.get<string>('imapUsername') || user;
+  const smtpUsername = cfg.get<string>('smtpUsername') || user;
+  const fromAddress = cfg.get<string>('fromAddress') || smtpUsername;
+
+  console.error(`[Config] Resolved credentials: imapUsername=${imapUsername}, smtpUsername=${smtpUsername}, fromAddress=${fromAddress}`);
+
   return {
     IMAP: {
       host,
       port,
-      username: user,
+      username: imapUsername,
       password: pass,
       tls,
     },
     SMTP: {
       host: smtpHost,
       port: smtpPort,
-      username: user,
+      username: smtpUsername,
       password: pass,
       secure: smtpSecure,
+      fromAddress,
     },
     sendMode,
     remoteUrl: remoteUrl || 'https://smtp-service.mimikkai.ru',
