@@ -18,7 +18,8 @@ describe('Service API - Validation Tests (using Hono test)', () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.service).toBe('mcp-mail-service');
-    expect(data.version).toBe('0.1.0');
+    expect(data.version).toBe('0.1.0-mcp-mail');
+    expect(data.startedAt).toEqual(expect.any(String));
   });
 
   test('GET /health should return ok', async () => {

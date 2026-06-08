@@ -4,6 +4,17 @@ import { SentMailHistoryService } from './sentMail/historyService';
 import { getSignatureConfig, stripHtml } from './sentMail/signature';
 import { getDefaultAttachmentsConfig } from './sentMail/attachments';
 import { getSendMode, getRemoteUrl } from './mail/config';
+import { DebugSink, withDebugCapture } from './debug/debugRunner';
+
+function setServiceDebugSink(service: any, sink: DebugSink | null): void {
+  if (service && typeof service.setDebugCapture === 'function') {
+    try {
+      service.setDebugCapture(sink);
+    } catch (err) {
+      mcpMailOutputChannel.warn('[MCP Mail] setDebugCapture failed:', err instanceof Error ? err.message : String(err));
+    }
+  }
+}
 
 export class MailSidebarProvider implements vscode.TreeDataProvider<MailSidebarItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<MailSidebarItem | undefined | null | void> =
@@ -157,25 +168,34 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
               const results: string[] = [];
 
               mcpMailOutputChannel.info('[MCP Mail] Testing remote connection...');
-              try {
-                await service.ensureIMAPConnection();
-                results.push(`✅ IMAP (remote): ${config.remoteUrl}`);
-                mcpMailOutputChannel.info('[MCP Mail] Remote IMAP OK');
-              } catch (imapError) {
-                const msg = imapError instanceof Error ? imapError.message : String(imapError);
-                results.push(`❌ IMAP (remote): ${msg}`);
-                mcpMailOutputChannel.error('[MCP Mail] Remote IMAP failed:', msg);
-              }
+              await withDebugCapture('mcpMail.checkConnection (remote)', true, async (sink) => {
+                setServiceDebugSink(service, sink);
+                sink(`Target: ${config.remoteUrl}`);
+                sink(`IMAP: ${config.IMAP.host}:${config.IMAP.port} (user=${config.IMAP.username})`);
+                sink(`SMTP: ${config.SMTP.host}:${config.SMTP.port} (user=${config.SMTP.username}, from=${config.SMTP.fromAddress})`);
+                try {
+                  await service.ensureIMAPConnection();
+                  results.push(`✅ IMAP (remote): ${config.remoteUrl}`);
+                  mcpMailOutputChannel.info('[MCP Mail] Remote IMAP OK');
+                } catch (imapError) {
+                  const msg = imapError instanceof Error ? imapError.message : String(imapError);
+                  results.push(`❌ IMAP (remote): ${msg}`);
+                  mcpMailOutputChannel.error('[MCP Mail] Remote IMAP failed:', msg);
+                  sink(`IMAP check failed: ${msg}`);
+                }
 
-              try {
-                await service.ensureSMTPConnection();
-                results.push(`✅ SMTP (remote): ${config.remoteUrl}`);
-                mcpMailOutputChannel.info('[MCP Mail] Remote SMTP OK');
-              } catch (smtpError) {
-                const msg = smtpError instanceof Error ? smtpError.message : String(smtpError);
-                results.push(`❌ SMTP (remote): ${msg}`);
-                mcpMailOutputChannel.error('[MCP Mail] Remote SMTP failed:', msg);
-              }
+                try {
+                  await service.ensureSMTPConnection();
+                  results.push(`✅ SMTP (remote): ${config.remoteUrl}`);
+                  mcpMailOutputChannel.info('[MCP Mail] Remote SMTP OK');
+                } catch (smtpError) {
+                  const msg = smtpError instanceof Error ? smtpError.message : String(smtpError);
+                  results.push(`❌ SMTP (remote): ${msg}`);
+                  mcpMailOutputChannel.error('[MCP Mail] Remote SMTP failed:', msg);
+                  sink(`SMTP check failed: ${msg}`);
+                }
+                setServiceDebugSink(service, null);
+              });
 
               vscode.window.showInformationMessage(results.join('  |  '), { modal: false });
             } else {
@@ -341,15 +361,24 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
               mcpMailOutputChannel.info('[MCP Mail] Sending test email via remote service');
               const { getMailService } = require('./mailTools');
               const service = getMailService();
-              await service.ensureSMTPConnection();
-              const result = await service.sendEmail({
-                to: recipient,
-                subject: 'Тестовое письмо — MCP Mail',
-                text: mailText,
-                html: mailHtml,
-                attachments: attachmentPaths,
+              let capturedResult: any = null;
+              await withDebugCapture('mcpMail.sendTestEmail (remote)', true, async (sink) => {
+                setServiceDebugSink(service, sink);
+                sink(`To: ${recipient}`);
+                sink(`Subject: Тестовое письмо — MCP Mail`);
+                sink(`From: ${config.SMTP.fromAddress || config.SMTP.username}`);
+                sink(`Attachments: ${attachmentPaths?.length ?? 0}`);
+                await service.ensureSMTPConnection();
+                capturedResult = await service.sendEmail({
+                  to: recipient,
+                  subject: 'Тестовое письмо — MCP Mail',
+                  text: mailText,
+                  html: mailHtml,
+                  attachments: attachmentPaths,
+                });
+                setServiceDebugSink(service, null);
               });
-              mcpMailOutputChannel.info('[MCP Mail] Test email sent via remote service:', JSON.stringify(result));
+              mcpMailOutputChannel.info('[MCP Mail] Test email sent via remote service:', JSON.stringify(capturedResult));
             } else {
               const { SMTPClient } = require('./mail/smtp-client');
               const client = new SMTPClient(config.SMTP);

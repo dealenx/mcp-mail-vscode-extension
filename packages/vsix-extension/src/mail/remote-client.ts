@@ -2,6 +2,7 @@ import { mcpMailOutputChannel } from '../logger';
 import { getMailConfig, getSendMode, getRemoteUrl } from './config';
 import { getDefaultAttachmentsConfig } from '../sentMail/attachments';
 import { getSignatureConfig, stripHtml } from '../sentMail/signature';
+import { DebugSink, maskSensitive } from '../debug/debugRunner';
 import { randomUUID } from 'crypto';
 
 export class RemoteMailClient {
@@ -10,15 +11,38 @@ export class RemoteMailClient {
   private imapConnected = false;
   private smtpConnected = false;
   private keepaliveInterval: ReturnType<typeof setInterval> | null = null;
+  private debugSink: DebugSink | null = null;
 
   constructor(baseUrl?: string) {
     this.baseUrl = baseUrl || getRemoteUrl();
     mcpMailOutputChannel.info(`[RemoteClient] 🌐 Remote mode active — proxy: ${this.baseUrl}`);
   }
 
+  setDebugCapture(sink: DebugSink | null): void {
+    this.debugSink = sink;
+    mcpMailOutputChannel.debug(`[RemoteClient] Debug capture ${sink ? 'enabled' : 'disabled'}`);
+  }
+
+  private sink(line: string): void {
+    if (this.debugSink) this.debugSink(line);
+  }
+
+  private summarizeBody(body: any): string {
+    if (body === undefined || body === null) return '(empty)';
+    try {
+      const json = JSON.stringify(maskSensitive(body));
+      if (json.length <= 500) return json;
+      return `${json.substring(0, 500)}... [+${json.length - 500} bytes]`;
+    } catch {
+      const s = String(body);
+      return s.length <= 500 ? s : `${s.substring(0, 500)}... [+${s.length - 500} bytes]`;
+    }
+  }
+
   private async request(path: string, body: any, method: string = 'POST', signal?: AbortSignal): Promise<any> {
     const url = `${this.baseUrl}/api/${path}`;
     mcpMailOutputChannel.debug(`[RemoteClient] ${method} ${url}`);
+    this.sink(`→ ${method} ${url}`);
 
     const timeoutMs = 120_000;
     const controller = new AbortController();
@@ -35,13 +59,16 @@ export class RemoteMailClient {
         signal: controller.signal,
       };
       if (method !== 'GET') {
-        options.body = JSON.stringify(body);
+        const bodyStr = JSON.stringify(body);
+        options.body = bodyStr;
+        this.sink(`  body: ${this.summarizeBody(body)}`);
+        this.sink(`  body bytes: ${bodyStr.length}`);
       } else if (body && body.sessionId) {
         const params = new URLSearchParams({ sessionId: body.sessionId });
         const urlWithParams = `${url}?${params.toString()}`;
         const response = await fetch(urlWithParams, options);
         clearTimeout(timeoutId);
-        return this.handleResponse(response, url);
+        return this.handleResponse(response, urlWithParams);
       }
 
       const response = await fetch(url, options);
@@ -50,7 +77,15 @@ export class RemoteMailClient {
     } catch (error) {
       clearTimeout(timeoutId);
       if (controller.signal.aborted && signal?.aborted) {
+        this.sink(`✗ Request cancelled: ${method} ${url}`);
         throw new Error(`Remote service request cancelled: ${method} ${url}`);
+      }
+      const err = error as any;
+      const cause = err?.cause;
+      if (cause?.code) {
+        this.sink(`✗ Network error code=${cause.code} syscall=${cause.syscall ?? 'n/a'} address=${cause.address ?? 'n/a'}:${cause.port ?? 'n/a'}`);
+      } else {
+        this.sink(`✗ ${method} ${url} — ${err instanceof Error ? err.message : String(err)}`);
       }
       const errMsg = error instanceof Error ? error.message : String(error);
       mcpMailOutputChannel.error(`[RemoteClient] Request failed: ${method} ${url} - ${errMsg}`);
@@ -59,13 +94,29 @@ export class RemoteMailClient {
   }
 
   private async handleResponse(response: Response, url: string): Promise<any> {
+    const startedAt = Date.now();
+    this.sink(`← response from ${url}`);
     const text = await response.text();
+    const duration = Date.now() - startedAt;
+    this.sink(`  status: ${response.status} ${response.statusText}`);
+    this.sink(`  duration: ${duration} ms`);
+    this.sink(`  body bytes: ${text.length}`);
+
     let data: any;
     try {
       data = JSON.parse(text);
+      this.sink(`  body[0..500]: ${text.substring(0, 500)}${text.length > 500 ? '...' : ''}`);
     } catch {
-      mcpMailOutputChannel.error(`[RemoteClient] Invalid JSON response from ${url}: ${text.substring(0, 200)}`);
-      throw new Error(`Remote service returned invalid JSON: ${text.substring(0, 200)}`);
+      this.sink(`  body[0..500] (non-JSON): ${text.substring(0, 500)}${text.length > 500 ? '...' : ''}`);
+      mcpMailOutputChannel.error(`[RemoteClient] Invalid JSON response from ${url}: status=${response.status} body=${text.substring(0, 200)}`);
+      if (response.status === 502 || response.status === 503 || response.status === 504) {
+        const friendly = `Remote service is temporarily unavailable (HTTP ${response.status} ${response.statusText}). ` +
+          `This usually means the proxy is restarting or the upstream service is down. ` +
+          `Please retry in 5–10 seconds. The email may not have been sent — check your outbox before retrying to avoid duplicates.`;
+        this.sink(`✗ ${friendly}`);
+        throw new Error(friendly);
+      }
+      throw new Error(`Remote service returned invalid JSON (HTTP ${response.status}): ${text.substring(0, 200)}`);
     }
 
     if (!response.ok) {
