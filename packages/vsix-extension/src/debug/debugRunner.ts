@@ -74,16 +74,6 @@ export function createDebugCapture(command: string): DebugCapture {
   return { log, finish };
 }
 
-export async function askVerboseLog(command: string): Promise<boolean> {
-  const choice = await vscode.window.showInformationMessage(
-    `Открыть расширенные логи в редакторе для команды «${command}»?`,
-    { modal: false, detail: 'Логи покажут URL запроса, заголовки, статус, длительность и первые 500 символов ответа сервера.' },
-    'Да, открыть лог',
-    'Нет',
-  );
-  return choice === 'Да, открыть лог';
-}
-
 export async function openDebugLogInEditor(content: string, command: string): Promise<void> {
   const tsLabel = new Date().toISOString().replace(/[:.]/g, '-');
   const doc = await vscode.workspace.openTextDocument({
@@ -106,14 +96,7 @@ export async function withDebugCapture<T>(
     return action(() => {});
   }
 
-  const wantsVerbose = await askVerboseLog(command);
-  if (!wantsVerbose) {
-    mcpMailOutputChannel.info(`[DebugRunner] ${command}: user declined verbose log`);
-    return action(() => {});
-  }
-
   const capture = createDebugCapture(command);
-  capture.log(`User accepted verbose log`);
   mcpMailOutputChannel.info(`[DebugRunner] ${command}: verbose capture started`);
 
   let result: T;
