@@ -40,9 +40,7 @@ export class SMTPClient {
       throw new Error('Send mail cancelled before starting');
     }
 
-    const fromAddr = options.from || this.config.fromAddress || this.config.username;
-    const fromName = this.config.fromName?.trim();
-    const fromHeader = fromName ? `${fromName} <${fromAddr}>` : fromAddr;
+    const fromHeader = options.from || this.config.fromAddress || this.config.username;
     console.error(`[FIX-FROMNAME] sendMail from header: ${fromHeader}`);
 
     const mailOptions = {
