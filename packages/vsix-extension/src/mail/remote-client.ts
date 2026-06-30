@@ -204,6 +204,7 @@ export class RemoteMailClient {
         password: config.SMTP.password,
         secure: config.SMTP.secure,
         fromAddress: config.SMTP.fromAddress,
+        fromName: config.SMTP.fromName,
       },
     });
 
@@ -437,10 +438,15 @@ export class RemoteMailClient {
     mcpMailOutputChannel.info(`[RemoteClient] Idempotency key: ${idempotencyKey}`);
 
     const config = getMailConfig();
+    const remoteFromName = config.SMTP.fromName?.trim();
+    const remoteFromHeader = remoteFromName
+      ? `${remoteFromName} <${config.SMTP.fromAddress}>`
+      : config.SMTP.fromAddress;
+    mcpMailOutputChannel.info(`[FIX-FROMNAME] Remote sendEmail fromName="${config.SMTP.fromName || ''}" fromHeader="${remoteFromHeader}"`);
 
     return this.requestNoRetry('send-email', {
       sessionId: this.sessionId,
-      from: config.SMTP.fromAddress,
+      from: remoteFromHeader,
       to: args.to,
       subject: args.subject,
       text: textContent,
@@ -501,10 +507,15 @@ export class RemoteMailClient {
     mcpMailOutputChannel.info(`[RemoteClient] Idempotency key: ${idempotencyKey}`);
 
     const config = getMailConfig();
+    const remoteReplyFromName = config.SMTP.fromName?.trim();
+    const remoteReplyFromHeader = remoteReplyFromName
+      ? `${remoteReplyFromName} <${config.SMTP.fromAddress}>`
+      : config.SMTP.fromAddress;
+    mcpMailOutputChannel.info(`[FIX-FROMNAME] Remote replyEmail fromName="${config.SMTP.fromName || ''}" fromHeader="${remoteReplyFromHeader}"`);
 
     return this.requestNoRetry('reply-email', {
       sessionId: this.sessionId,
-      from: config.SMTP.fromAddress,
+      from: remoteReplyFromHeader,
       originalUid: args.originalUid,
       text: textContent,
       html: htmlContent,

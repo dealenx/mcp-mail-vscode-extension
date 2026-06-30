@@ -7,6 +7,7 @@ export interface SMTPConfig {
   username: string;
   password: string;
   fromAddress?: string;
+  fromName?: string;
 }
 
 export interface EmailOptions {
@@ -68,8 +69,13 @@ export class SMTPClient {
       throw new Error('Send mail cancelled before starting');
     }
 
+    const fromAddr = options.from || this.config.fromAddress || this.config.username;
+    const fromName = this.config.fromName?.trim();
+    const fromHeader = fromName ? `${fromName} <${fromAddr}>` : fromAddr;
+    console.error(`[FIX-FROMNAME] Local sendMail from header: ${fromHeader}`);
+
     const mailOptions = {
-      from: options.from || this.config.fromAddress || this.config.username,
+      from: fromHeader,
       to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
       cc: options.cc ? (Array.isArray(options.cc) ? options.cc.join(', ') : options.cc) : undefined,
       bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc.join(', ') : options.bcc) : undefined,

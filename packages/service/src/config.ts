@@ -12,6 +12,8 @@ export interface ConnectRequest {
     username: string;
     password: string;
     secure?: boolean;
+    fromAddress?: string;
+    fromName?: string;
   };
 }
 

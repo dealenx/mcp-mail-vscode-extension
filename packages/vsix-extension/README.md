@@ -24,6 +24,8 @@
 | `mcpMail.smtpSecure` | `true` | Использовать TLS для SMTP |
 | `mcpMail.accountLogin` | — | Логин почты |
 | `mcpMail.accountPassword` | — | Пароль почты |
+| `mcpMail.fromAddress` | — | Адрес отправителя (если отличается от логина) |
+| `mcpMail.fromName` | — | Имя отправителя, отображаемое в поле `From:` |
 
 > Для Яндекс почты используйте [пароль приложения](https://id.yandex.ru/security/app-passwords).
 

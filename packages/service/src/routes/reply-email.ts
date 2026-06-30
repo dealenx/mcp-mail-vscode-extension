@@ -109,6 +109,8 @@ replyEmailRouter.post('/', async (c) => {
       html: finalHtml,
     };
 
+    console.error(`[FIX-FROMNAME] replyEmail session=${sessionId} fromName="${session.smtpConfig.fromName || ''}" fromHeader="${emailOptions.from}"`);
+
     if (attachments && attachments.length > 0) {
       emailOptions.attachments = attachments.map((att) => ({
         filename: att.filename,
@@ -124,9 +126,15 @@ replyEmailRouter.post('/', async (c) => {
     try {
       const sentMailbox = await findSentMailbox(imap);
       if (sentMailbox) {
-        const rawMessage = buildRawEmailMessage(emailOptions, result.messageId, session.smtpConfig.fromAddress || session.smtpConfig.username);
+        const rawMessage = buildRawEmailMessage(
+          emailOptions,
+          result.messageId,
+          session.smtpConfig.fromAddress || session.smtpConfig.username,
+          session.smtpConfig.fromName
+        );
         await imap.saveMessageToFolder(rawMessage, sentMailbox);
         sentFolderResult.saved = true;
+        console.error(`[FIX-FROMNAME] ReplyEmail saved Sent copy with From: ${session.smtpConfig.fromName?.trim() ? `${session.smtpConfig.fromName.trim()} <${session.smtpConfig.fromAddress || session.smtpConfig.username}>` : (session.smtpConfig.fromAddress || session.smtpConfig.username)}`);
       }
     } catch (err) {
       console.error('[ReplyEmail] Failed to save to sent folder:', err instanceof Error ? err.message : String(err));

@@ -63,6 +63,8 @@ sendEmailRouter.post('/', async (c) => {
       bcc: bcc ? (bcc.includes(',') ? bcc.split(',').map((e: string) => e.trim()) : bcc) : undefined,
     };
 
+    console.error(`[FIX-FROMNAME] sendEmail session=${sessionId} fromName="${session.smtpConfig.fromName || ''}" fromHeader="${emailOptions.from}"`);
+
     if (attachments && attachments.length > 0) {
       emailOptions.attachments = attachments.map((att) => ({
         filename: att.filename,
@@ -79,9 +81,15 @@ sendEmailRouter.post('/', async (c) => {
       const imap = await getIMAPClient(sessionId);
       const sentMailbox = await findSentMailbox(imap);
       if (sentMailbox) {
-        const rawMessage = buildRawEmailMessage(emailOptions, result.messageId, session.smtpConfig.fromAddress || session.smtpConfig.username);
+        const rawMessage = buildRawEmailMessage(
+          emailOptions,
+          result.messageId,
+          session.smtpConfig.fromAddress || session.smtpConfig.username,
+          session.smtpConfig.fromName
+        );
         await imap.saveMessageToFolder(rawMessage, sentMailbox);
         sentFolderResult.saved = true;
+        console.error(`[FIX-FROMNAME] SendEmail saved Sent copy with From: ${session.smtpConfig.fromName?.trim() ? `${session.smtpConfig.fromName.trim()} <${session.smtpConfig.fromAddress || session.smtpConfig.username}>` : (session.smtpConfig.fromAddress || session.smtpConfig.username)}`);
       }
     } catch (err) {
       console.error('[SendEmail] Failed to save to sent folder:', err instanceof Error ? err.message : String(err));
@@ -132,14 +140,16 @@ async function findSentMailbox(imap: any): Promise<string | null> {
   return null;
 }
 
-function buildRawEmailMessage(options: any, messageId: string | undefined, fromEmail: string): string {
+function buildRawEmailMessage(options: any, messageId: string | undefined, fromEmail: string, fromName?: string): string {
   const now = new Date();
   const msgId = messageId || `<${Date.now()}.${Math.random().toString(36)}@${fromEmail.split('@')[1] || 'localhost'}>`;
+  const trimmedName = fromName?.trim();
+  const fromHeader = trimmedName ? `${trimmedName} <${fromEmail}>` : fromEmail;
 
   let raw = '';
   raw += `Message-ID: ${msgId}\r\n`;
   raw += `Date: ${now.toUTCString()}\r\n`;
-  raw += `From: ${fromEmail}\r\n`;
+  raw += `From: ${fromHeader}\r\n`;
   raw += `To: ${Array.isArray(options.to) ? options.to.join(', ') : options.to}\r\n`;
   if (options.cc) raw += `Cc: ${Array.isArray(options.cc) ? options.cc.join(', ') : options.cc}\r\n`;
   if (options.bcc) raw += `Bcc: ${Array.isArray(options.bcc) ? options.bcc.join(', ') : options.bcc}\r\n`;

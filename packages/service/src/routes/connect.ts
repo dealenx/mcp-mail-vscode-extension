@@ -19,6 +19,7 @@ const connectSchema = z.object({
     password: z.string().min(1),
     secure: z.boolean().optional().default(true),
     fromAddress: z.string().optional(),
+    fromName: z.string().optional(),
   }),
 });
 

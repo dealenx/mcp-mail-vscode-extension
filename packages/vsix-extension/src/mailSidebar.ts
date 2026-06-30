@@ -172,7 +172,7 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
                 setServiceDebugSink(service, sink);
                 sink(`Target: ${config.remoteUrl}`);
                 sink(`IMAP: ${config.IMAP.host}:${config.IMAP.port} (user=${config.IMAP.username})`);
-                sink(`SMTP: ${config.SMTP.host}:${config.SMTP.port} (user=${config.SMTP.username}, from=${config.SMTP.fromAddress})`);
+                sink(`SMTP: ${config.SMTP.host}:${config.SMTP.port} (user=${config.SMTP.username}, from=${config.SMTP.fromName?.trim() ? `${config.SMTP.fromName.trim()} <${config.SMTP.fromAddress}>` : config.SMTP.fromAddress})`);
                 try {
                   await service.ensureIMAPConnection();
                   results.push(`✅ IMAP (remote): ${config.remoteUrl}`);
@@ -366,7 +366,7 @@ export function registerSidebarCommands(context: vscode.ExtensionContext, sentMa
                 setServiceDebugSink(service, sink);
                 sink(`To: ${recipient}`);
                 sink(`Subject: Тестовое письмо — MCP Mail`);
-                sink(`From: ${config.SMTP.fromAddress || config.SMTP.username}`);
+                sink(`From: ${config.SMTP.fromName?.trim() ? `${config.SMTP.fromName.trim()} <${config.SMTP.fromAddress || config.SMTP.username}>` : (config.SMTP.fromAddress || config.SMTP.username)}`);
                 sink(`Attachments: ${attachmentPaths?.length ?? 0}`);
                 await service.ensureSMTPConnection();
                 capturedResult = await service.sendEmail({

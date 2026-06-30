@@ -420,6 +420,10 @@ export class MailService {
       bcc: args.bcc ? args.bcc.split(',').map((e) => e.trim()) : undefined,
     };
 
+    const sendFromName = config.SMTP.fromName?.trim();
+    if (sendFromName) emailOptions.from = `${sendFromName} <${config.SMTP.fromAddress}>`;
+    mcpMailOutputChannel.info(`[FIX-FROMNAME] MailService.sendEmail fromName="${config.SMTP.fromName || ''}" fromHeader="${emailOptions.from}"`);
+
     if (!emailOptions.text && !emailOptions.html) {
       throw new Error('Either text or html content is required');
     }
@@ -552,6 +556,10 @@ export class MailService {
       html: finalHtml,
     };
 
+    const replyFromName = config.SMTP.fromName?.trim();
+    if (replyFromName) emailOptions.from = `${replyFromName} <${config.SMTP.fromAddress}>`;
+    mcpMailOutputChannel.info(`[FIX-FROMNAME] MailService.replyToEmail fromName="${config.SMTP.fromName || ''}" fromHeader="${emailOptions.from}"`);
+
     // Append default attachments if enabled
     const defaultAttReply = getDefaultAttachmentsConfig();
     if (defaultAttReply.enabled && defaultAttReply.files.length > 0) {
@@ -624,11 +632,14 @@ export class MailService {
     const config = getMailConfig();
     const now = new Date();
     const msgId = messageId || `<${Date.now()}.${Math.random().toString(36)}@${config.IMAP.host}>`;
+    const fromAddr = config.SMTP.fromAddress || config.SMTP.username;
+    const fromName = config.SMTP.fromName?.trim();
+    const fromHeader = fromName ? `${fromName} <${fromAddr}>` : fromAddr;
 
     let raw = '';
     raw += `Message-ID: ${msgId}\r\n`;
     raw += `Date: ${now.toUTCString()}\r\n`;
-    raw += `From: ${config.SMTP.fromAddress || config.SMTP.username}\r\n`;
+    raw += `From: ${fromHeader}\r\n`;
     raw += `To: ${Array.isArray(emailOptions.to) ? emailOptions.to.join(', ') : emailOptions.to}\r\n`;
 
     if (emailOptions.cc) {
